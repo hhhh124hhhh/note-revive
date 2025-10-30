@@ -6,6 +6,11 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
+
+  /* 暗色主题适配 */
+  [data-theme="dark"] body {
+    @apply bg-gray-900 text-gray-100;
+  }
   
   /* 移动端优化：防止双击缩放 */
   * {
@@ -44,10 +49,89 @@
     .btn-primary, .btn-secondary {
       @apply min-h-[44px] text-base;
     }
-    
+
     .card {
       @apply rounded-lg;
     }
+  }
+
+  /* 暗色主题下的组件样式覆盖 */
+  [data-theme="dark"] .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800;
+  }
+
+  [data-theme="dark"] .btn-secondary {
+    @apply bg-gray-700 text-gray-200 border-gray-600 hover:bg-gray-600 active:bg-gray-500;
+  }
+
+  [data-theme="dark"] .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  [data-theme="dark"] .input-field {
+    @apply bg-gray-700 border-gray-600 text-gray-100;
+  }
+
+  [data-theme="dark"] .input-field:focus {
+    @apply border-primary-500;
+  }
+
+  [data-theme="dark"] .tag-badge {
+    @apply border-gray-600;
+  }
+
+  /* 暗色主题下的标签按钮特殊处理 */
+  [data-theme="dark"] .tag-badge.bg-gray-200 {
+    @apply bg-gray-700 text-gray-300;
+  }
+
+  /* 暗色主题下的灰色背景按钮 */
+  [data-theme="dark"] .bg-gray-100 {
+    @apply bg-gray-700 text-gray-300;
+  }
+
+  [data-theme="dark"] .bg-gray-100:hover {
+    @apply bg-gray-600;
+  }
+
+  [data-theme="dark"] .bg-gray-200 {
+    @apply bg-gray-700 text-gray-300;
+  }
+
+  [data-theme="dark"] .bg-gray-200:hover {
+    @apply bg-gray-600;
+  }
+
+  [data-theme="dark"] .markdown-preview {
+    @apply text-gray-100;
+  }
+
+  [data-theme="dark"] .markdown-preview h1,
+  [data-theme="dark"] .markdown-preview h2,
+  [data-theme="dark"] .markdown-preview h3,
+  [data-theme="dark"] .markdown-preview h4,
+  [data-theme="dark"] .markdown-preview h5,
+  [data-theme="dark"] .markdown-preview h6 {
+    @apply text-gray-100;
+  }
+
+  [data-theme="dark"] .markdown-preview p,
+  [data-theme="dark"] .markdown-preview ul,
+  [data-theme="dark"] .markdown-preview ol,
+  [data-theme="dark"] .markdown-preview li {
+    @apply text-gray-300;
+  }
+
+  [data-theme="dark"] .markdown-preview code {
+    @apply bg-gray-700 text-gray-100;
+  }
+
+  [data-theme="dark"] .markdown-preview pre {
+    @apply bg-gray-700 border-gray-600;
+  }
+
+  [data-theme="dark"] .markdown-preview blockquote {
+    @apply border-primary-400 text-gray-400;
   }
 }
 

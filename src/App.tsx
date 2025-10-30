@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { 
-  Home, 
-  Search, 
-  Tag, 
-  Award, 
+import {
+  Home,
+  Search,
+  Tag,
+  Award,
   Plus,
   X,
   Save,
@@ -14,20 +14,43 @@ import {
   Unlock,
   Calendar,
   TrendingUp,
-  EyeOff
+  EyeOff,
+  Settings as SettingsIcon
 } from 'lucide-react';
-import { db, Note, initUserPoints, addPoints, checkAchievements, checkReviewReminder, ACHIEVEMENTS, encryptContent, decryptContent } from './db';
+import {
+  db,
+  Note,
+  initUserPoints,
+  addPoints,
+  checkAchievements,
+  checkReviewReminder,
+  ACHIEVEMENTS,
+  encryptContent,
+  decryptContent,
+  initDefaultSettings,
+  initDefaultShortcuts
+} from './db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-type View = 'home' | 'search' | 'tags' | 'achievements' | 'editor';
-type EditorMode = 'edit' | 'preview' | 'split';
+import {
+  View,
+  EditorMode,
+  EditingNote,
+  Theme
+} from './types';
+import { useShortcuts } from './hooks/useShortcuts';
+import { useSettings } from './hooks/useSettings';
+import { useNotifications } from './hooks/useNotifications';
+import ShortcutsPanel from './components/ShortcutsPanel';
+import Settings from './components/Settings';
+import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
+import { getTagTextColor } from './utils/colorContrast';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
-  const [editingNote, setEditingNote] = useState<Partial<Note>>({
+  const [editingNote, setEditingNote] = useState<EditingNote>({
     content: '',
     tags: [],
     isPrivate: false,
@@ -41,25 +64,118 @@ function App() {
   const [newTagColor, setNewTagColor] = useState('#3b82f6');
   const [showTagCreator, setShowTagCreator] = useState(false);
 
+  // 设置和快捷键系统
+  const {
+    settings,
+    updateSettings,
+    toggleTheme
+  } = useSettings({
+    onThemeChange: () => {
+      // 主题变更处理逻辑已在useSettings中实现
+    }
+  });
+
+  // 导出数据函数需要在useShortcuts之前定义
+  const handleExportData = async () => {
+    if (!settings) return;
+
+    try {
+      const { exportNotes, generateExportFilename, downloadFile } = await import('./utils/format');
+      const allNotes = await db.notes.toArray();
+      const exportedData = exportNotes(allNotes, settings.exportFormat);
+      const filename = generateExportFilename(settings.exportFormat);
+
+      const mimeType = settings.exportFormat === 'json' ? 'application/json' :
+                      settings.exportFormat === 'markdown' ? 'text/markdown' : 'text/plain';
+
+      downloadFile(exportedData, filename, mimeType);
+    } catch (error) {
+      console.error('导出数据失败:', error);
+      showError('导出失败', '请重试');
+    }
+  };
+
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const {
+    shortcutsState,
+    closeShortcutsPanel,
+    handleShortcutsSearch,
+    handleShortcutsKeyDown,
+    selectShortcutItem
+  } = useShortcuts({
+    onToggleShortcuts: () => setShortcutsOpen(true),
+    onNewNote: () => {
+      setCurrentNote(null);
+      setEditingNote({
+        content: '',
+        tags: [],
+        isPrivate: false,
+        status: 'draft'
+      });
+      setCurrentView('editor');
+    },
+    onSearch: () => setCurrentView('search'),
+    onSave: () => {
+      if (currentView === 'editor') {
+        saveNote();
+      }
+    },
+    onSettings: () => setCurrentView('settings'),
+    onToggleTheme: toggleTheme,
+    onExportData: handleExportData,
+    onFocusSearch: () => {
+      setCurrentView('search');
+      // 聚焦搜索框的逻辑
+    }
+  });
+
+  // 通知系统
+  const {
+    notifications,
+    isPanelOpen,
+    showError,
+    showAchievement,
+    removeNotification,
+    clearNotifications
+  } = useNotifications({
+    maxNotifications: 10,
+    defaultDuration: 5000,
+    enablePanel: true
+  });
+
   // 加载数据
   const notes = useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray());
   const tags = useLiveQuery(() => db.tags.orderBy('createdAt').toArray());
   const userPoints = useLiveQuery(() => db.userPoints.get(1));
-  const recentActivities = useLiveQuery(() => 
+  const recentActivities = useLiveQuery(() =>
     db.activities.orderBy('timestamp').reverse().limit(10).toArray()
   );
 
+  
   // 初始化
   useEffect(() => {
-    initUserPoints();
-    
-    const checkReminder = async () => {
-      const needsReminder = await checkReviewReminder();
-      if (needsReminder) {
-        setShowReviewReminder(true);
+    const initializeApp = async () => {
+      try {
+        await Promise.all([
+          initUserPoints(),
+          initDefaultSettings(),
+          initDefaultShortcuts()
+        ]);
+
+        const checkReminder = async () => {
+          const needsReminder = await checkReviewReminder();
+          if (needsReminder) {
+            setShowReviewReminder(true);
+          }
+        };
+        checkReminder();
+      } catch (error) {
+        console.error('应用初始化失败:', error);
       }
     };
-    checkReminder();
+
+    initializeApp();
 
     // 根据屏幕尺寸设置默认编辑器模式
     const handleResize = () => {
@@ -69,7 +185,7 @@ function App() {
         setEditorMode('split');
       }
     };
-    
+
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -78,7 +194,7 @@ function App() {
   // 创建或更新便签
   const saveNote = async () => {
     if (!editingNote.content || !editingNote.content.trim()) {
-      alert('请填写内容');
+      showError('内容为空', '请填写便签内容');
       return;
     }
 
@@ -91,11 +207,12 @@ function App() {
 
     if (currentNote?.id) {
       await db.notes.update(currentNote.id, {
-        ...editingNote,
         content,
-        updatedAt: now,
-        status: 'saved'
-      } as Note);
+        tags: editingNote.tags || [],
+        isPrivate: editingNote.isPrivate || false,
+        status: 'saved',
+        updatedAt: now
+      });
     } else {
       const newNote: Note = {
         id: `note-${Date.now()}`,
@@ -112,9 +229,18 @@ function App() {
       
       const unlockedAchievements = await checkAchievements();
       if (unlockedAchievements.length > 0) {
-        alert(`恭喜解锁新成就：${unlockedAchievements.map(id => 
-          ACHIEVEMENTS.find(a => a.id === id)?.name
-        ).join(', ')}`);
+        const achievementNames = unlockedAchievements.map(id =>
+          ACHIEVEMENTS.find(a => a.id === id)
+        ).filter(Boolean);
+
+        achievementNames.forEach(achievement => {
+          const points = achievement?.pointsReward || 0;
+          showAchievement(
+            `🎉 ${achievement?.name}`,
+            achievement?.description,
+            points
+          );
+        });
       }
     }
 
@@ -154,7 +280,7 @@ function App() {
         await db.notes.delete(id);
       } catch (error) {
         console.error('删除便签失败:', error);
-        alert('删除失败，请重试');
+        showError('删除失败', '请重试');
       }
     }
   };
@@ -168,9 +294,18 @@ function App() {
     
     const unlockedAchievements = await checkAchievements();
     if (unlockedAchievements.length > 0) {
-      alert(`恭喜解锁新成就：${unlockedAchievements.map(id => 
-        ACHIEVEMENTS.find(a => a.id === id)?.name
-      ).join(', ')}`);
+      const achievementNames = unlockedAchievements.map(id =>
+        ACHIEVEMENTS.find(a => a.id === id)
+      ).filter(Boolean);
+
+      achievementNames.forEach(achievement => {
+        const points = achievement?.pointsReward || 0;
+        showAchievement(
+          `🎉 ${achievement?.name}`,
+          achievement?.description,
+          points
+        );
+      });
     }
   };
 
@@ -307,13 +442,13 @@ function App() {
         </button>
 
         <button
-          onClick={() => setCurrentView('achievements')}
+          onClick={() => setCurrentView('settings')}
           className={`flex flex-col items-center justify-center w-full h-full ${
-            currentView === 'achievements' ? 'text-primary-600' : 'text-gray-600'
+            currentView === 'settings' ? 'text-primary-600' : 'text-gray-600'
           }`}
         >
-          <Award size={24} />
-          <span className="text-xs mt-1">成就</span>
+          <SettingsIcon size={24} />
+          <span className="text-xs mt-1">设置</span>
         </button>
       </div>
     </div>
@@ -367,13 +502,25 @@ function App() {
         <button
           onClick={() => setCurrentView('achievements')}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-            currentView === 'achievements' 
-              ? 'bg-primary-50 text-primary-700' 
+            currentView === 'achievements'
+              ? 'bg-primary-50 text-primary-700'
               : 'text-gray-700 hover:bg-gray-50'
           }`}
         >
           <Award size={20} />
           <span className="font-medium">成就</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentView('settings')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+            currentView === 'settings'
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <SettingsIcon size={20} />
+          <span className="font-medium">设置</span>
         </button>
       </nav>
 
@@ -451,10 +598,13 @@ function App() {
               {note.tags.map(tag => {
                 const tagData = tags?.find(t => t.name === tag);
                 return (
-                  <span 
+                  <span
                     key={tag}
-                    className="tag-badge text-white text-xs"
-                    style={{ backgroundColor: tagData?.color || '#3b82f6' }}
+                    className="tag-badge text-xs"
+                    style={{
+                      backgroundColor: tagData?.color || '#3b82f6',
+                      color: getTagTextColor(tagData?.color || '#3b82f6')
+                    }}
                   >
                     {tag}
                   </span>
@@ -548,9 +698,10 @@ function App() {
               <button
                 key={tag.id}
                 onClick={() => setFilterTag(tag.name)}
-                className={`tag-badge min-h-[44px] px-4 ${filterTag === tag.name ? 'text-white' : 'text-gray-700'}`}
-                style={{ 
-                  backgroundColor: filterTag === tag.name ? tag.color : '#e5e7eb'
+                className="tag-badge min-h-[44px] px-4"
+                style={{
+                  backgroundColor: filterTag === tag.name ? tag.color : '#e5e7eb',
+                  color: filterTag === tag.name ? getTagTextColor(tag.color) : '#374151'
                 }}
               >
                 {tag.name}
@@ -591,10 +742,13 @@ function App() {
                 {note.tags.map(tag => {
                   const tagData = tags?.find(t => t.name === tag);
                   return (
-                    <span 
+                    <span
                       key={tag}
-                      className="tag-badge text-white text-xs"
-                      style={{ backgroundColor: tagData?.color || '#3b82f6' }}
+                      className="tag-badge text-xs"
+                      style={{
+                        backgroundColor: tagData?.color || '#3b82f6',
+                        color: getTagTextColor(tagData?.color || '#3b82f6')
+                      }}
                     >
                       {tag}
                     </span>
@@ -907,10 +1061,13 @@ function App() {
             {editingNote.tags?.map(tag => {
               const tagData = tags?.find(t => t.name === tag);
               return (
-                <span 
+                <span
                   key={tag}
-                  className="tag-badge text-white flex items-center gap-1 min-h-[36px] px-3"
-                  style={{ backgroundColor: tagData?.color || '#3b82f6' }}
+                  className="tag-badge flex items-center gap-1 min-h-[36px] px-3"
+                  style={{
+                    backgroundColor: tagData?.color || '#3b82f6',
+                    color: getTagTextColor(tagData?.color || '#3b82f6')
+                  }}
                 >
                   {tag}
                   <button
@@ -1063,11 +1220,58 @@ function App() {
           {currentView === 'search' && renderSearch()}
           {currentView === 'tags' && renderTags()}
           {currentView === 'achievements' && renderAchievements()}
+          {currentView === 'settings' && (
+            <Settings
+              onClose={() => setCurrentView('home')}
+              onThemeChange={(theme: Theme) => {
+                if (settings) {
+                  updateSettings({ theme });
+                }
+              }}
+            />
+          )}
           {currentView === 'editor' && renderEditor()}
         </div>
       </div>
-      {currentView !== 'editor' && renderMobileNav()}
+      {currentView !== 'editor' && currentView !== 'settings' && renderMobileNav()}
       {showReviewReminder && renderReviewReminder()}
+
+      {/* 快捷方式面板 */}
+      <ShortcutsPanel
+        isOpen={shortcutsOpen || shortcutsState.isOpen}
+        searchQuery={shortcutsState.searchQuery}
+        selectedIndex={shortcutsState.selectedIndex}
+        filteredItems={shortcutsState.filteredItems}
+        onClose={() => {
+          setShortcutsOpen(false);
+          closeShortcutsPanel();
+        }}
+        onSearch={handleShortcutsSearch}
+        onKeyDown={handleShortcutsKeyDown}
+        onSelectItem={selectShortcutItem}
+      />
+
+      {/* 通知面板 */}
+      {isPanelOpen && (
+        <NotificationPanel
+          notifications={notifications}
+          onClose={removeNotification}
+          onClearAll={clearNotifications}
+        />
+      )}
+
+      {/* 浮动通知卡片 */}
+      {notifications
+        .filter(n => !n.autoClose)
+        .slice(-3)
+        .map(notification => (
+          <NotificationCard
+            key={notification.id}
+            notification={notification}
+            onClose={() => removeNotification(notification.id)}
+          />
+        ))
+      }
     </div>
   );
 }

@@ -1,64 +1,65 @@
 import Dexie, { Table } from 'dexie';
 import CryptoJS from 'crypto-js';
+import {
+  Tag,
+  ActivityRecord,
+  UserPoints,
+  Achievement,
+  Theme,
+  FontSize,
+  Language,
+  ExportFormat,
+  Note as NoteType
+} from './types';
 
-export interface Note {
-  id?: string;
-  content: string;
-  tags: string[];
-  isPrivate: boolean;
-  status: 'draft' | 'saved' | 'reviewed' | 'reused';
+// 新增设置接口（如果需要直接在db.ts中使用）
+export interface DbSettings {
+  id: number;
+  theme: Theme;
+  fontSize: FontSize;
+  autoSave: boolean;
+  language: Language;
+  exportFormat: ExportFormat;
+  aiEnabled: boolean;
+  aiProvider?: 'openai' | 'claude' | 'custom';
+  aiApiKey?: string;
   createdAt: Date;
   updatedAt: Date;
-  lastReviewedAt?: Date;
-  pointsAwarded?: number;
 }
 
-export interface Tag {
-  id?: string;
-  name: string;
-  color: string;
-  createdAt: Date;
-}
-
-export interface ActivityRecord {
-  id?: string;
-  type: 'note_created' | 'note_reviewed' | 'note_reused' | 'achievement_unlocked';
-  points: number;
-  timestamp: Date;
-  metadata?: Record<string, any>;
-}
-
-export interface UserPoints {
-  id: number;
-  totalPoints: number;
-  level: number;
-  unlockedAchievements: string[];
-  lastReviewReminder?: Date;
-}
-
-export interface Achievement {
+export interface DbCustomShortcut {
   id: string;
   name: string;
-  description: string;
-  pointsReward: number;
-  criteria: string;
-  unlocked: boolean;
+  keys: string;
+  action: string;
+  enabled: boolean;
 }
 
 class NoteReviveDB extends Dexie {
-  notes!: Table<Note, string>;
+  notes!: Table<NoteType, string>;
   tags!: Table<Tag, string>;
   activities!: Table<ActivityRecord, string>;
   userPoints!: Table<UserPoints, number>;
+  settings!: Table<DbSettings, number>;
+  customShortcuts!: Table<DbCustomShortcut, string>;
 
   constructor() {
     super('NoteReviveDB');
-    
+
     this.version(1).stores({
       notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
       tags: 'id, name, createdAt',
       activities: 'id, type, timestamp',
       userPoints: 'id'
+    });
+
+    this.version(2).stores({
+      notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
+      tags: 'id, name, createdAt',
+      activities: 'id, type, timestamp',
+      userPoints: 'id',
+      settings: 'id, theme, fontSize, language',
+      customShortcuts: 'id, action, enabled'
     });
   }
 }
@@ -237,3 +238,90 @@ export async function checkReviewReminder(): Promise<boolean> {
 
   return false;
 }
+
+// ========== 设置相关函数 ==========
+
+// 初始化默认设置
+export async function initDefaultSettings(): Promise<void> {
+  const existing = await db.settings.get(1);
+  if (!existing) {
+    await db.settings.add({
+      id: 1,
+      theme: 'light',
+      fontSize: 'medium',
+      autoSave: true,
+      language: 'zh',
+      exportFormat: 'json',
+      aiEnabled: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+}
+
+// 获取设置
+export async function getSettings(): Promise<DbSettings> {
+  const settings = await db.settings.get(1);
+  if (!settings) {
+    await initDefaultSettings();
+    return (await db.settings.get(1))!;
+  }
+  return settings;
+}
+
+// 更新设置
+export async function updateSettings(updates: Partial<DbSettings>): Promise<void> {
+  await db.settings.update(1, {
+    ...updates,
+    updatedAt: new Date()
+  });
+}
+
+// 初始化默认快捷键
+export async function initDefaultShortcuts(): Promise<void> {
+  const existingCount = await db.customShortcuts.count();
+  if (existingCount === 0) {
+    const defaultShortcuts: DbCustomShortcut[] = [
+      { id: 'default-toggleShortcuts', name: '打开快捷面板', keys: 'Ctrl+K', action: 'toggleShortcuts', enabled: true },
+      { id: 'default-newNote', name: '新建便签', keys: 'Ctrl+N', action: 'newNote', enabled: true },
+      { id: 'default-search', name: '快速搜索', keys: 'Ctrl+F', action: 'search', enabled: true },
+      { id: 'default-save', name: '保存便签', keys: 'Ctrl+S', action: 'save', enabled: true },
+      { id: 'default-settings', name: '打开设置', keys: 'Ctrl+,', action: 'settings', enabled: true },
+      { id: 'default-toggleTheme', name: '切换主题', keys: 'Ctrl+Shift+T', action: 'toggleTheme', enabled: true },
+      { id: 'default-exportData', name: '导出数据', keys: 'Ctrl+Shift+E', action: 'exportData', enabled: true },
+      { id: 'default-focusSearch', name: '聚焦搜索框', keys: 'Ctrl+Shift+F', action: 'focusSearch', enabled: true }
+    ];
+    await db.customShortcuts.bulkAdd(defaultShortcuts);
+  }
+}
+
+// 获取所有快捷键
+export async function getShortcuts(): Promise<DbCustomShortcut[]> {
+  return await db.customShortcuts.toArray();
+}
+
+// 更新快捷键
+export async function updateShortcut(id: string, updates: Partial<DbCustomShortcut>): Promise<void> {
+  await db.customShortcuts.update(id, updates);
+}
+
+// 重置快捷键为默认
+export async function resetShortcutsToDefault(): Promise<void> {
+  await db.customShortcuts.clear();
+  await initDefaultShortcuts();
+}
+
+// 检查快捷键冲突
+export async function checkShortcutConflict(keys: string, excludeId?: string): Promise<boolean> {
+  const existing = await db.customShortcuts
+    .where('keys')
+    .equals(keys)
+    .and(shortcut => shortcut.enabled)
+    .toArray();
+
+  return existing.some(shortcut => shortcut.id !== excludeId);
+}
+
+// 导出必要的类型和函数
+export type { NoteType as Note };
+export { getComboString } from './constants/shortcuts';

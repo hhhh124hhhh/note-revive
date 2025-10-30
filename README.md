@@ -30,7 +30,7 @@ A modern note-taking application built with React, TypeScript, and Vite.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/note-revive.git
+   git clone https://github.com/hhhh124hhhh/note-revive.git
    ```
 
 2. Navigate to the project directory:
