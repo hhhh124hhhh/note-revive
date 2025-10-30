@@ -1,0 +1,186 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+  
+  /* 移动端优化：防止双击缩放 */
+  * {
+    touch-action: manipulation;
+  }
+  
+  /* 优化移动端文本选择 */
+  input, textarea {
+    @apply select-text;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:bg-primary-800 transition-colors duration-200 font-medium;
+  }
+  
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 active:bg-gray-400 transition-colors duration-200 font-medium;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all text-base;
+  }
+  
+  .tag-badge {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  /* 移动端触摸优化 */
+  @media (max-width: 768px) {
+    .btn-primary, .btn-secondary {
+      @apply min-h-[44px] text-base;
+    }
+    
+    .card {
+      @apply rounded-lg;
+    }
+  }
+}
+
+/* Markdown 样式 */
+.markdown-preview {
+  max-width: 100%;
+  line-height: 1.75;
+  color: #374151;
+}
+
+.markdown-preview h1 {
+  @apply text-2xl font-bold mt-6 mb-4;
+}
+
+.markdown-preview h2 {
+  @apply text-xl font-bold mt-5 mb-3;
+}
+
+.markdown-preview h3 {
+  @apply text-lg font-semibold mt-4 mb-2;
+}
+
+.markdown-preview p {
+  @apply mb-4 leading-relaxed;
+}
+
+.markdown-preview ul, .markdown-preview ol {
+  @apply mb-4 ml-6;
+}
+
+.markdown-preview li {
+  @apply mb-2;
+}
+
+.markdown-preview code {
+  @apply bg-gray-100 px-2 py-1 rounded text-sm font-mono;
+}
+
+.markdown-preview pre {
+  @apply bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4;
+}
+
+.markdown-preview pre code {
+  @apply bg-transparent p-0;
+}
+
+.markdown-preview blockquote {
+  @apply border-l-4 border-primary-500 pl-4 italic text-gray-600 my-4;
+}
+
+.markdown-preview a {
+  @apply text-primary-600 hover:text-primary-700 underline;
+}
+
+.markdown-preview table {
+  @apply w-full border-collapse mb-4;
+}
+
+.markdown-preview th {
+  @apply bg-gray-100 border border-gray-300 px-4 py-2 text-left font-semibold;
+}
+
+.markdown-preview td {
+  @apply border border-gray-300 px-4 py-2;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+/* 文本截断工具类 */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 移动端滚动优化 */
+@media (max-width: 768px) {
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 优化移动端输入框 */
+  input, textarea, select {
+    font-size: 16px;
+  }
+  
+  /* 防止移动端输入框放大 */
+  input:focus, textarea:focus, select:focus {
+    font-size: 16px;
+  }
+}
+
+/* 触摸设备的激活状态 */
+@media (hover: none) {
+  button:active {
+    transform: scale(0.98);
+  }
+}
+
+/* 安全区域适配 */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
