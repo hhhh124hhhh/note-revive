@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "Note Revive",
-    "version": "1.0.0"
+    "version": "1.0.1"
   },
   "tauri": {
     "allowlist": {
@@ -52,7 +52,14 @@
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "",
+        "wix": {
+          "language": ["zh-CN", "en-US"]
+        },
+        "nsis": {
+          "displayLanguageSelector": true,
+          "languages": ["SimpChinese", "English"]
+        }
       }
     },
     "security": {
