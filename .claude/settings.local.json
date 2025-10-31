@@ -45,7 +45,8 @@
       "Bash(makensis.exe:*)",
       "Bash(\"F:/person/3-数字化集锦/note-revive/.nsis/nsis-3.08/makensis.exe\" installer.nsi)",
       "Bash(\"F:/person/3-数字化集锦/note-revive/.nsis/nsis-3.08/makensis.exe\" chinese-installer.nsi)",
-      "Bash(\"F:/person/3-数字化集锦/note-revive/.nsis/nsis-3.08/makensis.exe\" chinese-installer-utf8.nsi)"
+      "Bash(\"F:/person/3-数字化集锦/note-revive/.nsis/nsis-3.08/makensis.exe\" chinese-installer-utf8.nsi)",
+      "Bash(npm cache clean:*)"
     ],
     "deny": [],
     "ask": [],

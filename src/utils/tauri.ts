@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 // 检测是否在Tauri环境中
 export const isTauriApp = () => {
@@ -24,14 +24,14 @@ export const tauriAPI = {
   getAppVersion: async () => {
     if (isTauriApp()) {
       try {
-        const { app } = await import('@tauri-apps/api');
-        return await app.getVersion();
+        const { getVersion } = await import('@tauri-apps/api/app');
+        return await getVersion();
       } catch (error) {
         console.error('获取应用版本失败:', error);
-        return '1.0.0';
+        return '2.0.0';
       }
     }
-    return '1.0.0';
+    return '2.0.0';
   },
 
   // 窗口操作
@@ -39,8 +39,9 @@ export const tauriAPI = {
     minimize: async () => {
       if (isTauriApp()) {
         try {
-          const { appWindow } = await import('@tauri-apps/api/window');
-          await appWindow.minimize();
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const window = getCurrentWindow();
+          await window.minimize();
         } catch (error) {
           console.error('窗口最小化失败:', error);
         }
@@ -50,8 +51,9 @@ export const tauriAPI = {
     maximize: async () => {
       if (isTauriApp()) {
         try {
-          const { appWindow } = await import('@tauri-apps/api/window');
-          await appWindow.toggleMaximize();
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const window = getCurrentWindow();
+          await window.toggleMaximize();
         } catch (error) {
           console.error('窗口最大化失败:', error);
         }
@@ -61,8 +63,9 @@ export const tauriAPI = {
     close: async () => {
       if (isTauriApp()) {
         try {
-          const { appWindow } = await import('@tauri-apps/api/window');
-          await appWindow.close();
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const window = getCurrentWindow();
+          await window.close();
         } catch (error) {
           console.error('窗口关闭失败:', error);
         }
@@ -75,12 +78,12 @@ export const tauriAPI = {
     if (isTauriApp()) {
       try {
         // 简化实现，避免dialog模块问题
-        alert('Note Revive v1.0.0\n\n智能便签管理应用\n支持Markdown编辑和数据加密');
+        alert('Note Revive v2.0.0\n\n智能便签管理应用\n支持Markdown编辑和数据加密');
       } catch (error) {
         console.error('显示关于对话框失败:', error);
       }
     } else {
-      alert('Note Revive v1.0.0\n\n智能便签管理应用\n支持Markdown编辑和数据加密');
+      alert('Note Revive v2.0.0\n\n智能便签管理应用\n支持Markdown编辑和数据加密');
     }
   }
 };
