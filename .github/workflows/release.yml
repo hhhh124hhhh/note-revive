@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - release
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -25,6 +27,12 @@ jobs:
         with:
           node-version: lts/*
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Clear npm cache
+        run: |
+          npm cache clean --force
+          npm config set registry https://registry.npmjs.org/
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -35,7 +43,9 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: install frontend dependencies
-        run: npm install
+        run: |
+          npm install --prefer-offline --no-audit --no-fund
+          npm install --prefer-offline --no-audit --no-fund || npm install --prefer-offline --no-audit --no-fund
 
       - name: build frontend
         run: npm run build
@@ -53,6 +63,6 @@ jobs:
           tagName: app-v__VERSION__
           releaseName: 'App v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
