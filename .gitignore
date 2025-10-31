@@ -160,3 +160,14 @@ build.sh
 build.bat
 
 # Release documentation
+
+# Large build tools and installers
+vs_buildtools.exe
+wix311-binaries.zip
+nsis-3.zip
+
+# Built installers
+*.exe
+
+# NSIS installer scripts
+*-installer.nsi
