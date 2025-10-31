@@ -25,6 +25,12 @@ jobs:
         with:
           node-version: lts/*
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Clear npm cache
+        run: |
+          npm cache clean --force
+          npm config set registry https://registry.npmjs.org/
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -35,7 +41,9 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: install frontend dependencies
-        run: npm install
+        run: |
+          npm install --prefer-offline --no-audit --no-fund
+          npm install --prefer-offline --no-audit --no-fund || npm install --prefer-offline --no-audit --no-fund
 
       - name: build frontend
         run: npm run build
