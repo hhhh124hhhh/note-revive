@@ -18,6 +18,7 @@ import {
 import { DbSettings, DbCustomShortcut, Theme, FontSize, Language, ExportFormat } from '../types';
 import { getSettings, updateSettings, getShortcuts, updateShortcut, resetShortcutsToDefault, checkShortcutConflict } from '../db';
 import { downloadFile, generateExportFilename, exportNotes } from '../utils/format';
+import { useDialog } from '../hooks/useDialog';
 
 interface SettingsProps {
   onClose?: () => void;
@@ -33,6 +34,9 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
   const [tempKeys, setTempKeys] = useState('');
   const [conflictError, setConflictError] = useState<string | null>(null);
+
+  // 现代弹窗系统
+  const { showConfirm, showError } = useDialog();
 
   // 加载设置
   useEffect(() => {
@@ -99,15 +103,20 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
 
   // 重置快捷键
   const resetShortcuts = async () => {
-    if (confirm('确定要重置所有快捷键为默认设置吗？')) {
-      try {
-        await resetShortcutsToDefault();
-        const newShortcuts = await getShortcuts();
-        setShortcuts(newShortcuts);
-      } catch (error) {
-        console.error('重置快捷键失败:', error);
+    showConfirm(
+      '重置快捷键',
+      '确定要重置所有快捷键为默认设置吗？',
+      async () => {
+        try {
+          await resetShortcutsToDefault();
+          const newShortcuts = await getShortcuts();
+          setShortcuts(newShortcuts);
+        } catch (error) {
+          console.error('重置快捷键失败:', error);
+          showError('重置失败', '请重试');
+        }
       }
-    }
+    );
   };
 
   // 导出数据
@@ -466,10 +475,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
               </div>
               <button
                 onClick={() => {
-                  if (confirm('确定要清空所有便签数据吗？此操作不可恢复！')) {
-                    // 这里可以实现清空数据的逻辑
-                    alert('功能开发中...');
-                  }
+                  showConfirm(
+                    '清空数据',
+                    '确定要清空所有便签数据吗？此操作不可恢复！',
+                    async () => {
+                      // 这里可以实现清空数据的逻辑
+                      showError('功能开发中', '清空数据功能即将推出');
+                    }
+                  );
                 }}
                 className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >

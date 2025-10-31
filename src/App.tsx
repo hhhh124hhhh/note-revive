@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Home,
   Search,
@@ -42,6 +42,7 @@ import {
 import { useShortcuts } from './hooks/useShortcuts';
 import { useSettings } from './hooks/useSettings';
 import { useNotifications } from './hooks/useNotifications';
+import { useDialog } from './hooks/useDialog';
 import ShortcutsPanel from './components/ShortcutsPanel';
 import Settings from './components/Settings';
 import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
@@ -91,7 +92,7 @@ function App() {
       downloadFile(exportedData, filename, mimeType);
     } catch (error) {
       console.error('导出数据失败:', error);
-      showError('导出失败', '请重试');
+      showErrorNotification('导出失败', '请重试');
     }
   };
 
@@ -134,7 +135,7 @@ function App() {
   const {
     notifications,
     isPanelOpen,
-    showError,
+    showError: showErrorNotification,
     showAchievement,
     removeNotification,
     clearNotifications
@@ -144,15 +145,31 @@ function App() {
     enablePanel: true
   });
 
+  // 现代弹窗系统
+  const { showConfirm, showError, DialogComponent } = useDialog();
+
+  // 添加刷新触发器状态
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   // 加载数据
   const notes = useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray());
   const tags = useLiveQuery(() => db.tags.orderBy('createdAt').toArray());
-  const userPoints = useLiveQuery(() => db.userPoints.get(1));
+  // 优化等级查询：使用 toArray() 代替 get() 以更好地监听变化，并添加刷新触发器
+  const userPointsList = useLiveQuery(
+    () => db.userPoints.where('id').equals(1).toArray(),
+    [refreshTrigger] // 依赖项，当 refreshTrigger 变化时重新查询
+  );
+  const userPoints = userPointsList?.[0]; // 获取第一条记录
   const recentActivities = useLiveQuery(() =>
     db.activities.orderBy('timestamp').reverse().limit(10).toArray()
   );
 
   
+  // 强制刷新等级显示的函数
+  const refreshUserPoints = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
+
   // 初始化
   useEffect(() => {
     const initializeApp = async () => {
@@ -194,7 +211,7 @@ function App() {
   // 创建或更新便签
   const saveNote = async () => {
     if (!editingNote.content || !editingNote.content.trim()) {
-      showError('内容为空', '请填写便签内容');
+      showErrorNotification('内容为空', '请填写便签内容');
       return;
     }
 
@@ -226,6 +243,9 @@ function App() {
       await db.notes.add(newNote);
       
       await addPoints(1, 'note_created', { noteId: newNote.id });
+      
+      // 强制刷新等级显示
+      refreshUserPoints();
       
       const unlockedAchievements = await checkAchievements();
       if (unlockedAchievements.length > 0) {
@@ -261,7 +281,7 @@ function App() {
       try {
         content = decryptContent(content);
       } catch (error) {
-        alert('解密失败，可能密钥不正确');
+        showError('解密失败', '可能密钥不正确');
         return;
       }
     }
@@ -275,14 +295,18 @@ function App() {
   };
 
   const deleteNote = async (id: string) => {
-    if (window.confirm('确定要删除这条便签吗？')) {
-      try {
-        await db.notes.delete(id);
-      } catch (error) {
-        console.error('删除便签失败:', error);
-        showError('删除失败', '请重试');
+    showConfirm(
+      '删除便签',
+      '确定要删除这条便签吗？',
+      async () => {
+        try {
+          await db.notes.delete(id);
+        } catch (error) {
+          console.error('删除便签失败:', error);
+          showErrorNotification('删除失败', '请重试');
+        }
       }
-    }
+    );
   };
 
   const markAsReviewed = async (note: Note) => {
@@ -291,6 +315,9 @@ function App() {
       lastReviewedAt: new Date()
     });
     await addPoints(2, 'note_reviewed', { noteId: note.id });
+    
+    // 强制刷新等级显示
+    refreshUserPoints();
     
     const unlockedAchievements = await checkAchievements();
     if (unlockedAchievements.length > 0) {
@@ -349,9 +376,13 @@ function App() {
   };
 
   const deleteTag = async (id: string) => {
-    if (confirm('确定要删除这个标签吗？相关便签不会被删除。')) {
-      await db.tags.delete(id);
-    }
+    showConfirm(
+      '删除标签',
+      '确定要删除这个标签吗？相关便签不会被删除。',
+      async () => {
+        await db.tags.delete(id);
+      }
+    );
   };
 
   const addTagToNote = (tagName: string) => {
@@ -1272,6 +1303,9 @@ function App() {
           />
         ))
       }
+
+      {/* 现代弹窗组件 */}
+      <DialogComponent />
     </div>
   );
 }
