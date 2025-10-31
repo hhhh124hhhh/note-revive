@@ -18,6 +18,7 @@ A modern note-taking application built with React, TypeScript, and Vite.
 - **Database**: IndexedDB (via Dexie.js)
 - **Markdown**: react-markdown + remark-gfm
 - **Encryption**: crypto-js
+- **Desktop Framework**: Tauri (optional)
 
 ## Getting Started
 
@@ -25,6 +26,9 @@ A modern note-taking application built with React, TypeScript, and Vite.
 
 - Node.js (version 14 or higher)
 - npm, yarn, or pnpm
+
+For desktop app (Tauri):
+- Rust toolchain (optional, for desktop app development)
 
 ### Installation
 
@@ -79,6 +83,45 @@ yarn preview
 # or
 pnpm preview
 ```
+
+### Desktop App (Tauri)
+
+#### Prerequisites for Desktop
+Install Rust toolchain first:
+```bash
+# Windows
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Or use winget
+winget install Rustlang.Rust.MSVC
+```
+
+#### Development Mode
+Run the desktop app in development mode:
+```bash
+npm run tauri:dev
+```
+
+#### Build Desktop App
+Build the desktop executable:
+```bash
+npm run tauri:build
+```
+
+The built executable will be available in `src-tauri/target/release/bundle/` directory.
+
+### Automated Builds with GitHub Actions
+
+This repository is configured with GitHub Actions for automated building and releasing:
+
+1. Push to the `release` branch to trigger an automated build
+2. The workflow will create a new GitHub Release with the built executables
+3. Download the built executables from the Releases page
+
+To manually trigger a build:
+1. Go to the Actions tab in your GitHub repository
+2. Select the "Publish" workflow
+3. Click "Run workflow"
 
 ## Usage
 

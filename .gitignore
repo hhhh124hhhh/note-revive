@@ -129,3 +129,34 @@ cloudbaserc.json
 .skip-template
 remove_title_task.md
 remove_title_task.md
+
+# Tauri build output
+src-tauri/target/
+
+# WiX build output
+.wix/
+.wix311-binaries/
+
+# NSIS build output
+.nsis/
+
+# Images
+image.png
+image copy.png
+Quicker_20251031_131625.png
+
+# Build reports
+BUILD_COMPLETION_REPORT.md
+
+# Claude AI assistant
+.claude/
+
+# Rust analyzer
+target/
+rust-analyzer/
+
+# Build scripts
+build.sh
+build.bat
+
+# Release documentation

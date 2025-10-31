@@ -1,0 +1,78 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Note Revive",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "DeveloperTool",
+      "copyright": "© 2025 郝好先生 hhhh124hhhh@qq.com",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
+      "icon": [
+        "icons/icon.png",
+        "icons/icon.ico",
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/android-chrome-192x192.png",
+        "icons/android-chrome-512x512.png",
+        "icons/apple-touch-icon.png",
+        "icons/favicon-16x16.png",
+        "icons/favicon-32x32.png",
+        "icons/favicon.ico"
+      ],
+      "identifier": "com.noterevive.app",
+      "longDescription": "Note Revive 是一款智能便签管理应用，专为需要高效记录和管理笔记的用户设计。支持Markdown格式、数据加密、标签分类、全文搜索等功能，让您轻松管理各种笔记和想法。开发者为郝好先生，如有建议或问题请联系邮箱 hhhh124hhhh@qq.com。",
+      "macOS": {
+        "entitlements": null,
+        "exceptionDomain": "",
+        "frameworks": [],
+        "providerShortName": null,
+        "signingIdentity": null
+      },
+      "resources": [],
+      "shortDescription": "智能便签管理应用 - 作者: 郝好先生",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": null
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 800,
+        "resizable": true,
+        "title": "Note Revive - 智能便签管理",
+        "width": 1200,
+        "minWidth": 800,
+        "minHeight": 600,
+        "decorations": true,
+        "transparent": false
+      }
+    ]
+  }
+}
