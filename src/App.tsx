@@ -46,6 +46,7 @@ import ShortcutsPanel from './components/ShortcutsPanel';
 import Settings from './components/Settings';
 import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
 import { getTagTextColor } from './utils/colorContrast';
+import { isTauriApp, tauriAPI } from './utils/tauri';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
@@ -538,6 +539,11 @@ function App() {
       </div>
     </div>
   );
+
+  // 桌面版标题栏已移除，使用系统默认标题栏
+  const renderDesktopTitleBar = () => {
+    return null;
+  };
 
   // 移动端顶部导航栏（仅在非编辑器视图显示）
   const renderMobileHeader = () => (
@@ -1214,6 +1220,7 @@ function App() {
     <div className="h-screen flex bg-gray-50">
       {currentView !== 'editor' && renderSidebar()}
       <div className={`flex-1 flex flex-col overflow-hidden ${currentView === 'editor' ? 'w-full' : ''}`}>
+        {renderDesktopTitleBar()}
         {currentView !== 'editor' && renderMobileHeader()}
         <div className="flex-1 overflow-y-auto">
           {currentView === 'home' && renderHome()}
@@ -1228,6 +1235,8 @@ function App() {
                   updateSettings({ theme });
                 }
               }}
+              onShowAbout={tauriAPI.showAbout}
+              isDesktopApp={isTauriApp()}
             />
           )}
           {currentView === 'editor' && renderEditor()}

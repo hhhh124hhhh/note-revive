@@ -22,9 +22,11 @@ import { downloadFile, generateExportFilename, exportNotes } from '../utils/form
 interface SettingsProps {
   onClose?: () => void;
   onThemeChange?: (theme: Theme) => void;
+  onShowAbout?: () => void;
+  isDesktopApp?: boolean;
 }
 
-const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
+const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange, onShowAbout, isDesktopApp }) => {
   const [settings, setSettings] = useState<DbSettings | null>(null);
   const [shortcuts, setShortcuts] = useState<DbCustomShortcut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -305,18 +307,30 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
             {/* 自动保存 */}
             <div className="bg-white rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">其他设置</h3>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.autoSave}
-                  onChange={(e) => saveSettings({ autoSave: e.target.checked })}
-                  className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                />
-                <div>
-                  <div className="font-medium">自动保存</div>
-                  <div className="text-sm text-gray-500">编辑时自动保存便签内容</div>
-                </div>
-              </label>
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.autoSave}
+                    onChange={(e) => saveSettings({ autoSave: e.target.checked })}
+                    className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                  />
+                  <div>
+                    <div className="font-medium">自动保存</div>
+                    <div className="text-sm text-gray-500">编辑时自动保存便签内容</div>
+                  </div>
+                </label>
+                
+                {isDesktopApp && onShowAbout && (
+                  <button
+                    onClick={onShowAbout}
+                    className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    <SettingsIcon size={16} />
+                    关于应用
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}

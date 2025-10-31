@@ -1,0 +1,62 @@
+Note Revive Software License Agreement
+Version 1.0.0
+Last Updated: October 31, 2025
+
+Copyright (c) 2025 Hao Hao Xiansheng (hhhh124hhhh@qq.com)
+
+IMPORTANT NOTICE: Please read this license agreement carefully. Use of this software indicates your agreement to all terms of this agreement.
+
+=== License Terms ===
+
+1. Grant of License
+   This agreement grants you the right to use Note Revive software under the following conditions.
+
+2. Usage Rights
+   - You may use, copy, and distribute this software for free
+   - You may modify the software, but must clearly mark modifications
+   - This software is mainly for personal learning and non-commercial use
+
+3. Restrictions
+   - Prohibition of reverse engineering, decompilation, or disassembly of this software
+   - Prohibition of deleting or modifying copyright notices in the software
+   - Prohibition of using the software for illegal purposes
+
+4. Disclaimer
+   This software is provided "as is" without any express or implied warranties
+   The developer is not liable for any damages arising from the use of this software
+   Users are fully responsible for the results of using this software
+
+5. Data Security
+   This software is a "Smart Note Management Application" for helping users manage notes and ideas
+   The developer is not responsible for the security of data stored in the software
+   Users are advised to regularly backup important data
+
+6. Copyright Information
+   Software Name: Note Revive
+   Version: 1.0.0
+   Developer: Hao Hao Xiansheng
+   Contact Email: hhhh124hhhh@qq.com
+
+7. Termination
+   If you violate any terms of this agreement, this license will automatically terminate
+   Upon termination, you must immediately stop using this software and destroy all copies
+
+8. Applicable Law
+   This agreement is governed by the laws of the People's Republic of China
+   In case of disputes, they should be resolved through friendly negotiation
+
+=== Contact Information ===
+
+For any questions, suggestions, or technical support needs, please contact:
+
+Developer: Hao Hao Xiansheng
+Email: hhhh124hhhh@qq.com
+GitHub: https://github.com/hhhh124hhhh/note-revive
+
+=== Special Thanks ===
+
+Thanks to all users who provided feedback and suggestions for this software.
+
+---
+
+Click "I Agree" button indicates that you have read and agree to comply with the above license agreement.
