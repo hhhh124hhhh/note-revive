@@ -46,8 +46,11 @@ import { useDialog } from './hooks/useDialog';
 import ShortcutsPanel from './components/ShortcutsPanel';
 import Settings from './components/Settings';
 import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
+import AISearchSuggestions from './components/AISearchSuggestions';
+import RelatedNotes from './components/RelatedNotes';
 import { getTagTextColor, getTagBorderColor } from './utils/colorContrast';
 import { t } from './utils/i18n';
+import { aiSettingsService } from './services/ai';
 
   const formatDate = (date: Date, language: 'zh' | 'en' = 'zh'): string => {
   const locale = language === 'zh' ? 'zh-CN' : 'en-US';
@@ -280,7 +283,8 @@ function App() {
         await Promise.all([
           initUserPoints(),
           initDefaultSettings(),
-          initDefaultShortcuts()
+          initDefaultShortcuts(),
+          aiSettingsService.initialize()
         ]);
 
         const checkReminder = async () => {
@@ -904,10 +908,19 @@ function App() {
           </div>
         </div>
 
+        {/* AI搜索建议 - 当搜索无结果时显示 */}
+        {filteredNotes.length === 0 && searchQuery.length >= 2 && (
+          <AISearchSuggestions
+            query={searchQuery}
+            onSelectNote={viewNote}
+            isVisible={true}
+          />
+        )}
+
         <div className="space-y-4">
           {filteredNotes.map(note => {
             const preview = note.isPrivate ? t('encryptedContent') : note.content.substring(0, 60) + (note.content.length > 60 ? '...' : '');
-            
+
             return (
             <div
               key={note.id}
@@ -1277,6 +1290,13 @@ function App() {
                 {viewingNote.content}
               </ReactMarkdown>
             </div>
+
+            {/* 相关便签推荐 */}
+            <RelatedNotes
+              currentNote={viewingNote}
+              onSelectNote={viewNote}
+              isVisible={currentView === 'view'}
+            />
           </div>
         </div>
       </div>

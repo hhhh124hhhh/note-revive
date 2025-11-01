@@ -12,7 +12,15 @@
       "Bash(npx:*)",
       "Bash(npm search:*)",
       "Bash(curl:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:platform.deepseek.com)",
+      "WebFetch(domain:open.bigmodel.cn)",
+      "WebFetch(domain:kimi.moonshot.cn)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:www.kimi.com)",
+      "WebFetch(domain:docs.openai.com)",
+      "WebFetch(domain:api.deepseek.com)",
+      "WebFetch(domain:platform.moonshot.cn)"
     ],
     "deny": [],
     "ask": []

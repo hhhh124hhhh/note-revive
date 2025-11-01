@@ -22,6 +22,7 @@ import { useDialog } from '../hooks/useDialog';
 import { useSettings } from '../hooks/useSettings';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { t } from '../utils/i18n';
+import { EnhancedAISettings } from './EnhancedAISettings';
 
 interface SettingsProps {
   onClose?: () => void;
@@ -507,40 +508,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
         )}
 
         {activeTab === 'ai' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Monitor size={20} />
-                AI 功能设置
-              </h3>
-
-              <div className="space-y-4">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.aiEnabled}
-                    onChange={(e) => saveSettings({ aiEnabled: e.target.checked })}
-                    className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                  />
-                  <div>
-                    <div className="font-medium">{t('enableAIFeatures')}</div>
-                    <div className="text-sm text-gray-500">{t('enableAIDescription')}</div>
-                  </div>
-                </label>
-
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="text-sm text-gray-600">
-                    {t('aiFeaturesComingSoon')}
-                  </div>
-                  <ul className="mt-2 text-sm text-gray-600 space-y-1">
-                    <li>• {t('smartNoteCategorization')}</li>
-                    <li>• {t('contentSummarization')}</li>
-                    <li>• {t('smartSearch')}</li>
-                    <li>• {t('noteRecommendations')}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+          <div>
+            <EnhancedAISettings onClose={onClose} />
           </div>
         )}
       </div>

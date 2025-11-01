@@ -57,7 +57,7 @@ export interface AppSettings {
   language: Language;
   exportFormat: ExportFormat;
   aiEnabled: boolean;
-  aiProvider?: 'openai' | 'claude' | 'custom';
+  aiProvider?: 'openai' | 'claude' | 'mock';
   aiApiKey?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -72,7 +72,7 @@ export interface DbSettings {
   language: Language;
   exportFormat: ExportFormat;
   aiEnabled: boolean;
-  aiProvider?: 'openai' | 'claude' | 'custom';
+  aiProvider?: 'openai' | 'claude' | 'mock';
   aiApiKey?: string;
   createdAt: Date;
   updatedAt: Date;

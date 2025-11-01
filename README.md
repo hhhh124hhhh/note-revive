@@ -9,6 +9,13 @@ A modern note-taking application built with React, TypeScript, and Vite.
 - Responsive design with Tailwind CSS
 - Data encryption for sensitive information
 - GitHub Flavored Markdown (GFM) support
+- **AI-Powered Features:**
+  - Smart search suggestions with semantic understanding
+  - Intelligent note relationship recommendations
+  - Smart review reminders based on content importance
+  - Support for multiple AI providers (DeepSeek, 智谱AI, Kimi, OpenAI, Claude)
+  - Dynamic model selection and management
+  - Local-first processing with data privacy protection
 
 ## Tech Stack
 
@@ -83,6 +90,59 @@ yarn preview
 # or
 pnpm preview
 ```
+
+## AI Features Configuration
+
+### Environment Setup
+
+To use AI features, you need to configure API keys for AI service providers:
+
+1. **Copy the environment configuration file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit the `.env` file** with your API keys:
+   ```bash
+   # DeepSeek AI (recommended for Chinese users)
+   VITE_DEEPSEEK_API_KEY=sk-your-deepseek-api-key-here
+
+   # 智谱AI GLM
+   VITE_ZHIPU_API_KEY=your-zhipu-api-key-here
+
+   # Kimi Moonshot
+   VITE_KIMI_API_KEY=sk-your-kimi-api-key-here
+
+   # OpenAI
+   VITE_OPENAI_API_KEY=sk-your-openai-api-key-here
+
+   # Claude (Anthropic)
+   VITE_CLAUDE_API_KEY=sk-ant-your-claude-api-key-here
+   ```
+
+### Getting API Keys
+
+- **DeepSeek AI**: [platform.deepseek.com](https://platform.deepseek.com/)
+- **智谱AI GLM**: [open.bigmodel.cn](https://open.bigmodel.cn/)
+- **Kimi Moonshot**: [platform.moonshot.cn](https://platform.moonshot.cn/)
+- **OpenAI**: [platform.openai.com](https://platform.openai.com/)
+- **Claude**: [console.anthropic.com](https://console.anthropic.com/)
+
+### In-App Configuration
+
+1. Start the application
+2. Go to **Settings** → **AI** tab
+3. Configure your preferred AI providers
+4. Test connections and select models
+5. Enable AI features as needed
+
+### AI Features
+
+- **Smart Search**: Semantic understanding to find related content when keyword search fails
+- **Note Relationships**: Automatic discovery of related notes to build knowledge networks
+- **Smart Reminders**: AI-powered recommendations for important notes to review
+- **Multi-Provider Support**: Choose from multiple AI service providers
+- **Privacy Protection**: Local-first processing with encrypted API key storage
 
 ### Desktop App (Tauri)
 
