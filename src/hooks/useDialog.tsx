@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { AlertDialog } from '../components/ui/AlertDialog';
+import { t } from '../utils/i18n';
 
-export type DialogType = 'confirm' | 'alert' | 'error' | 'success' | 'info';
+export type DialogType = 'confirm' | 'alert' | 'error' | 'success' | 'info' | 'warning' | 'danger';
 
 interface DialogState {
   isOpen: boolean;
@@ -42,8 +43,8 @@ export function useDialog() {
       type: options?.type || 'confirm',
       title,
       message,
-      confirmText: options?.confirmText || '确认',
-      cancelText: options?.cancelText || '取消',
+      confirmText: options?.confirmText || t('confirm'),
+      cancelText: options?.cancelText || t('cancel'),
       onConfirm: async () => {
         if (onConfirm) {
           setDialogState(prev => ({ ...prev, loading: true }));
@@ -70,7 +71,7 @@ export function useDialog() {
       type,
       title,
       message,
-      confirmText: '确定',
+      confirmText: t('ok'),
       onConfirm: closeDialog,
       loading: false
     });
@@ -126,7 +127,7 @@ export function useDialog() {
         title={dialogState.title}
         message={dialogState.message}
         confirmText={dialogState.confirmText!}
-        type={dialogState.type}
+        type={dialogState.type === 'alert' ? 'info' : dialogState.type as any}
       />
     );
   };

@@ -151,15 +151,17 @@ export function calculateLevel(points: number): number {
 }
 
 // 添加积分
-export async function addPoints(points: number, type: ActivityRecord['type'], metadata?: Record<string, any>): Promise<void> {
+export async function addPoints(points: number, type: ActivityRecord['type'], metadata?: Record<string, any>): Promise<{ leveledUp: boolean; newLevel: number }> {
   const userPoints = await db.userPoints.get(1);
   if (!userPoints) {
     await initUserPoints();
     return addPoints(points, type, metadata);
   }
 
+  const oldLevel = userPoints.level;
   const newTotal = userPoints.totalPoints + points;
   const newLevel = calculateLevel(newTotal);
+  const leveledUp = newLevel > oldLevel;
 
   await db.userPoints.update(1, {
     totalPoints: newTotal,
@@ -173,6 +175,8 @@ export async function addPoints(points: number, type: ActivityRecord['type'], me
     timestamp: new Date(),
     metadata
   });
+
+  return { leveledUp, newLevel };
 }
 
 // 检查并解锁成就

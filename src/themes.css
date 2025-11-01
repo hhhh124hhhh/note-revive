@@ -179,11 +179,11 @@
 }
 
 [data-theme="dark"] .text-gray-500 {
-  color: var(--color-text-tertiary) !important;
+  color: #cbd5e0 !important; /* 增强对比度 */
 }
 
 [data-theme="dark"] .text-gray-400 {
-  color: var(--color-text-tertiary) !important;
+  color: #cbd5e0 !important; /* 增强对比度 */
 }
 
 /* 边框颜色适配 */
@@ -235,7 +235,7 @@
 }
 
 [data-theme="dark"] .input-field::placeholder {
-  color: var(--color-text-tertiary);
+  color: #cbd5e0; /* 增强占位符对比度 */
 }
 
 /* 卡片样式适配 */
@@ -289,6 +289,76 @@
 [data-theme="dark"] .markdown-preview blockquote {
   color: var(--color-text-tertiary);
   border-color: var(--color-border);
+}
+
+/* 暗色主题下特定组件的增强对比度 */
+[data-theme="dark"] .bg-gray-50 {
+  background-color: #374151 !important;
+}
+
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-50 * {
+  color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] .bg-gray-50 .text-gray-500 {
+  color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] .bg-gray-50 .text-gray-600 {
+  color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] .bg-gray-50 .placeholder-gray-500 {
+  color: #d1d5db !important;
+}
+
+[data-theme="dark"] input[type="text"].bg-gray-50,
+[data-theme="dark"] input[type="color"].bg-gray-50,
+[data-theme="dark"] textarea.bg-gray-50 {
+  background-color: #4b5563 !important;
+  color: #f3f4f6 !important;
+  border-color: #6b7280 !important;
+}
+
+[data-theme="dark"] input[type="text"].bg-gray-50::placeholder,
+[data-theme="dark"] textarea.bg-gray-50::placeholder {
+  color: #d1d5db !important;
+}
+
+[data-theme="dark"] .border-gray-300 {
+  border-color: #4b5563 !important;
+}
+
+[data-theme="dark"] .border-gray-200 {
+  border-color: #4b5563 !important;
+}
+
+/* 暗色主题下的按钮强制对比度 */
+[data-theme="dark"] button {
+  color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] button.bg-gray-100,
+[data-theme="dark"] button.bg-gray-200 {
+  background-color: #4b5563 !important;
+  color: #f3f4f6 !important;
+  border-color: #6b7280 !important;
+}
+
+[data-theme="dark"] button.bg-gray-100:hover,
+[data-theme="dark"] button.bg-gray-200:hover {
+  background-color: #6b7280 !important;
+}
+
+/* 暗色主题下的卡片和容器 */
+[data-theme="dark"] .card {
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+}
+
+[data-theme="dark"] .card * {
+  color: #f3f4f6 !important;
 }
 
 /* 旧版.dark类兼容性 */

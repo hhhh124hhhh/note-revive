@@ -6,7 +6,13 @@
       "Bash(npm run build:*)",
       "Bash(npx tsc:*)",
       "Bash(node:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(claude mcp list:*)",
+      "Bash(claude:*)",
+      "Bash(npx:*)",
+      "Bash(npm search:*)",
+      "Bash(curl:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

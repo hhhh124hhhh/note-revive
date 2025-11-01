@@ -17,6 +17,10 @@ jobs:
         include:
           - platform: 'windows-latest'
             args: ''
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'macos-latest'
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -42,6 +46,12 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
       - name: install frontend dependencies
         run: |
           npm install --prefer-offline --no-audit --no-fund
@@ -50,7 +60,8 @@ jobs:
       - name: build frontend
         run: npm run build
 
-      - name: install WiX
+      - name: install WiX (windows only)
+        if: matrix.platform == 'windows-latest'
         run: |
           curl -L https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip -o wix311-binaries.zip
           7z x wix311-binaries.zip -owix311

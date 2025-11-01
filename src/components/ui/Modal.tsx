@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { t } from '../../utils/i18n';
 
 interface ModalProps {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export function Modal({
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="关闭"
+              aria-label={t('close')}
             >
               <X size={20} className="text-gray-500" />
             </button>

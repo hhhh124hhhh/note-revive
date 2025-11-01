@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info, Award, TrendingUp } from 'lucide-react';
+import { t } from '../utils/i18n';
 
 export type NotificationType = 'success' | 'error' | 'info' | 'achievement';
 
@@ -66,10 +67,10 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
     const diff = now.getTime() - date.getTime();
     const seconds = Math.floor(diff / 1000);
 
-    if (seconds < 60) return '刚刚';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟前`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}小时前`;
-    return `${Math.floor(seconds / 86400)}天前`;
+    if (seconds < 60) return t('justNow');
+    if (seconds < 3600) return t('minutesAgo', { count: Math.floor(seconds / 60) });
+    if (seconds < 86400) return t('hoursAgo', { count: Math.floor(seconds / 3600) });
+    return t('daysAgo', { days: Math.floor(seconds / 86400) });
   };
 
   if (!isVisible || notifications.length === 0) {
@@ -82,14 +83,14 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            通知中心
+            {t('notificationCenter')}
           </h3>
           <div className="flex items-center gap-2">
             <button
               onClick={onClearAll}
               className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
             >
-              清空全部
+              {t('clearAll')}
             </button>
             <button
               onClick={() => notifications.forEach(n => onClose(n.id))}
@@ -137,7 +138,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
                     <div className="mt-2 flex items-center gap-1">
                       <TrendingUp size={14} className="text-yellow-600 dark:text-yellow-400" />
                       <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
-                        +{notification.points} 积分
+                        +{notification.points} {t('points')}
                       </span>
                     </div>
                   )}
@@ -154,8 +155,8 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
         {/* 底部 */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-            <span>共 {notifications.length} 条通知</span>
-            <span>自动关闭已开启</span>
+            <span>{t('totalNotifications', { count: notifications.length })}</span>
+            <span>{t('autoCloseEnabled')}</span>
           </div>
         </div>
       </div>
@@ -246,7 +247,7 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             <div className="mt-2 flex items-center gap-1">
               <TrendingUp size={14} className="text-yellow-600 dark:text-yellow-400" />
               <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
-                +{notification.points} 积分
+                +{notification.points} {t('points')}
               </span>
             </div>
           )}

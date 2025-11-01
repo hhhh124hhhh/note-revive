@@ -1,5 +1,5 @@
-import React from 'react';
 import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
+import { t } from '../../utils/i18n';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -19,8 +19,8 @@ export function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText = t('confirm'),
+  cancelText = t('cancel'),
   type = 'default',
   loading = false
 }: ConfirmDialogProps) {

@@ -1,5 +1,5 @@
-import React from 'react';
 import { CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
+import { t } from '../../utils/i18n';
 
 interface AlertDialogProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ export function AlertDialog({
   onClose,
   title,
   message,
-  confirmText = '确定',
+  confirmText = t('ok'),
   type = 'info'
 }: AlertDialogProps) {
   if (!isOpen) return null;

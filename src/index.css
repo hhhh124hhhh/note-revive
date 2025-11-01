@@ -84,12 +84,12 @@
 
   /* 暗色主题下的标签按钮特殊处理 */
   [data-theme="dark"] .tag-badge.bg-gray-200 {
-    @apply bg-gray-700 text-gray-300;
+    @apply bg-gray-700 text-gray-200;
   }
 
   /* 暗色主题下的灰色背景按钮 */
   [data-theme="dark"] .bg-gray-100 {
-    @apply bg-gray-700 text-gray-300;
+    @apply bg-gray-700 text-gray-200;
   }
 
   [data-theme="dark"] .bg-gray-100:hover {
@@ -97,7 +97,7 @@
   }
 
   [data-theme="dark"] .bg-gray-200 {
-    @apply bg-gray-700 text-gray-300;
+    @apply bg-gray-700 text-gray-200;
   }
 
   [data-theme="dark"] .bg-gray-200:hover {
@@ -298,4 +298,91 @@
 
 .animate-slide-up {
   animation: slide-up 0.2s ease-out;
+}
+
+/* 等级提升动画 */
+@keyframes pulse-once {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-pulse-once {
+  animation: pulse-once 0.5s ease-in-out;
+}
+
+/* 升级成功特效 */
+@keyframes level-up {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3) rotate(5deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.level-up-animation {
+  animation: level-up 0.8s ease-in-out;
+}
+
+/* 进度条填充动画 */
+@keyframes progress-fill {
+  0% { width: 0; }
+  100% { width: var(--progress-width); }
+}
+
+.progress-animation {
+  animation: progress-fill 0.5s ease-out;
+}
+
+/* 字体大小设置 */
+.font-small {
+  font-size: 14px;
+}
+
+.font-medium {
+  font-size: 16px;
+}
+
+.font-large {
+  font-size: 18px;
+}
+
+/* 为不同字体大小设置行高 */
+.font-small {
+  line-height: 1.5;
+}
+
+.font-medium {
+  line-height: 1.6;
+}
+
+.font-large {
+  line-height: 1.7;
+}
+
+/* 针对不同元素调整字体大小 */
+.font-small h1 { font-size: 1.5rem; }
+.font-small h2 { font-size: 1.25rem; }
+.font-small h3 { font-size: 1.125rem; }
+
+.font-medium h1 { font-size: 1.75rem; }
+.font-medium h2 { font-size: 1.5rem; }
+.font-medium h3 { font-size: 1.25rem; }
+
+.font-large h1 { font-size: 2rem; }
+.font-large h2 { font-size: 1.75rem; }
+.font-large h3 { font-size: 1.5rem; }
+
+/* 响应式字体大小 */
+@media (max-width: 768px) {
+  .font-small { font-size: 13px; }
+  .font-medium { font-size: 15px; }
+  .font-large { font-size: 17px; }
 }
