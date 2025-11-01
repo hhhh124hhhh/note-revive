@@ -43,7 +43,7 @@ export interface Achievement {
 }
 
 // 新增设置相关接口
-export type View = 'home' | 'search' | 'tags' | 'achievements' | 'editor' | 'settings' | 'view';
+export type View = 'home' | 'search' | 'tags' | 'achievements' | 'editor' | 'settings';
 export type Theme = 'light' | 'dark' | 'blue' | 'green' | 'purple' | 'orange';
 export type FontSize = 'small' | 'medium' | 'large';
 export type Language = 'zh' | 'en';

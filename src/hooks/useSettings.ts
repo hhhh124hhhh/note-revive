@@ -45,16 +45,6 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
         applyTheme(updates.theme);
       }
 
-      // 如果字体大小改变，应用字体大小
-      if (updates.fontSize) {
-        applyFontSize(updates.fontSize);
-      }
-
-      // 如果语言改变，应用语言
-      if (updates.language) {
-        applyLanguage(updates.language);
-      }
-
       return newSettings;
     } catch (error) {
       console.error('更新设置失败:', error);
@@ -63,34 +53,6 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
       setUpdating(false);
     }
   }, [settings, options]);
-
-  // 应用字体大小
-  const applyFontSize = useCallback((fontSize: 'small' | 'medium' | 'large') => {
-    const body = document.body;
-
-    // 移除所有字体大小类
-    body.classList.remove('font-small', 'font-medium', 'font-large');
-
-    // 添加新的字体大小类
-    body.classList.add(`font-${fontSize}`);
-
-    // 保存到 localStorage 以便页面刷新后保持设置
-    localStorage.setItem('fontSize', fontSize);
-  }, []);
-
-  // 应用语言
-  const applyLanguage = useCallback((language: 'zh' | 'en') => {
-    const html = document.documentElement;
-
-    // 设置 html 的 lang 属性
-    html.setAttribute('lang', language);
-
-    // 保存到 localStorage
-    localStorage.setItem('language', language);
-
-    // 触发自定义事件，通知其他组件语言已变更
-    window.dispatchEvent(new CustomEvent('languagechange', { detail: language }));
-  }, []);
 
   // 应用主题
   const applyTheme = useCallback((theme: Theme) => {
@@ -121,34 +83,6 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
       applyTheme(settings.theme);
     }
   }, [settings?.theme, applyTheme]);
-
-  // 初始化字体大小
-  useEffect(() => {
-    if (settings?.fontSize) {
-      applyFontSize(settings.fontSize);
-    }
-  }, [settings?.fontSize, applyFontSize]);
-
-  // 初始化语言
-  useEffect(() => {
-    if (settings?.language) {
-      applyLanguage(settings.language);
-    }
-  }, [settings?.language, applyLanguage]);
-
-  // 页面加载时从 localStorage 恢复设置
-  useEffect(() => {
-    const savedFontSize = localStorage.getItem('fontSize') as 'small' | 'medium' | 'large';
-    const savedLanguage = localStorage.getItem('language') as 'zh' | 'en';
-
-    if (savedFontSize && !settings?.fontSize) {
-      applyFontSize(savedFontSize);
-    }
-
-    if (savedLanguage && !settings?.language) {
-      applyLanguage(savedLanguage);
-    }
-  }, [settings, applyFontSize, applyLanguage]);
 
   // 获取当前主题
   const getCurrentTheme = useCallback((): Theme => {
@@ -194,8 +128,6 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
     // 方法
     updateSettings: updateAppSettings,
     applyTheme,
-    applyFontSize,
-    applyLanguage,
     getCurrentTheme,
     toggleTheme,
     resetToDefaults,

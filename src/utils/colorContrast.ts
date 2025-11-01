@@ -77,7 +77,6 @@ export const getTextColor = (backgroundColor: string): string => {
 /**
  * 为标签背景色智能选择文字颜色
  * 考虑常见的标签颜色，确保可读性
- * 增强暗色主题下的对比度
  */
 export const getTagTextColor = (backgroundColor: string): string => {
   // 预定义一些常见标签颜色的最佳文字颜色
@@ -99,16 +98,8 @@ export const getTagTextColor = (backgroundColor: string): string => {
     return predefinedColors[backgroundColor.toLowerCase()];
   }
 
-  // 否则使用自动对比度检测，确保满足WCAG AA标准
-  const textColor = getTextColor(backgroundColor);
-  
-  // 检查对比度是否满足要求
-  if (meetsWCAG_AA(textColor, backgroundColor)) {
-    return textColor;
-  }
-  
-  // 如果不满足，调整颜色以提高对比度
-  return isLightColor(backgroundColor) ? '#000000' : '#ffffff';
+  // 否则使用自动对比度检测
+  return getTextColor(backgroundColor);
 };
 
 /**
@@ -177,13 +168,4 @@ export const adjustBrightness = (hex: string, percent: number): string => {
   const newB = Math.min(255, Math.max(0, Math.round(b * factor)));
 
   return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
-};
-
-/**
- * 为标签选择合适的边框颜色
- * 在暗色主题下提供更好的可见性
- */
-export const getTagBorderColor = (backgroundColor: string): string => {
-  // 在暗色主题下使用较亮的边框，在亮色主题下使用较暗的边框
-  return isLightColor(backgroundColor) ? '#d1d5db' : '#4b5563';
 };

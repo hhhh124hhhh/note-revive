@@ -290,7 +290,7 @@ export const useShortcuts = (options: UseShortcutsOptions = {}) => {
 
     getActionName: (action: string) => {
       const shortcut = shortcuts.find(s => s.action === action);
-      return shortcut?.name || (SHORTCUT_ACTIONS[action as keyof typeof SHORTCUT_ACTIONS] ? SHORTCUT_ACTIONS[action as keyof typeof SHORTCUT_ACTIONS]() : action);
+      return shortcut?.name || SHORTCUT_ACTIONS[action as keyof typeof SHORTCUT_ACTIONS] || action;
     }
   };
 };

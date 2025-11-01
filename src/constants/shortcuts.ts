@@ -1,6 +1,4 @@
 
-import { t } from '../utils/i18n';
-
 export const DEFAULT_SHORTCUTS = {
   'toggleShortcuts': 'Ctrl+K',
   'newNote': 'Ctrl+N',
@@ -13,15 +11,15 @@ export const DEFAULT_SHORTCUTS = {
 } as const;
 
 export const SHORTCUT_ACTIONS = {
-  'toggleShortcuts': () => t('toggleShortcutsAction'),
-  'newNote': () => t('newNoteAction'),
-  'search': () => t('searchAction'),
-  'save': () => t('saveAction'),
-  'settings': () => t('settingsAction'),
-  'toggleTheme': () => t('toggleThemeAction'),
-  'exportData': () => t('exportDataAction'),
-  'focusSearch': () => t('focusSearchAction')
-};
+  'toggleShortcuts': '打开快捷面板',
+  'newNote': '新建便签',
+  'search': '快速搜索',
+  'save': '保存便签',
+  'settings': '打开设置',
+  'toggleTheme': '切换主题',
+  'exportData': '导出数据',
+  'focusSearch': '聚焦搜索框'
+} as const;
 
 export const getComboString = (event: KeyboardEvent): string => {
   const parts: string[] = [];
@@ -40,7 +38,7 @@ export const getComboString = (event: KeyboardEvent): string => {
 // 主题颜色配置
 export const THEMES = {
   light: {
-    name: () => t('lightTheme'),
+    name: '亮色主题',
     primary: {
       50: '#f0f9ff',
       100: '#e0f2fe',
@@ -55,7 +53,7 @@ export const THEMES = {
     }
   },
   dark: {
-    name: () => t('darkTheme'),
+    name: '暗色主题',
     primary: {
       50: '#1e293b',
       100: '#334155',
@@ -70,7 +68,7 @@ export const THEMES = {
     }
   },
   blue: {
-    name: () => t('blueTheme'),
+    name: '蓝色主题',
     primary: {
       50: '#eff6ff',
       100: '#dbeafe',
@@ -85,7 +83,7 @@ export const THEMES = {
     }
   },
   green: {
-    name: () => t('greenTheme'),
+    name: '绿色主题',
     primary: {
       50: '#f0fdf4',
       100: '#dcfce7',
@@ -100,7 +98,7 @@ export const THEMES = {
     }
   },
   purple: {
-    name: () => t('purpleTheme'),
+    name: '紫色主题',
     primary: {
       50: '#faf5ff',
       100: '#f3e8ff',
@@ -115,7 +113,7 @@ export const THEMES = {
     }
   },
   orange: {
-    name: () => t('orangeTheme'),
+    name: '橙色主题',
     primary: {
       50: '#fff7ed',
       100: '#ffedd5',

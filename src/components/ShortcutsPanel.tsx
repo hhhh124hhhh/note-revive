@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Search, FileText, Settings, Palette, Download, Tag, Hash } from 'lucide-react';
 import { ShortcutItem } from '../types';
-import { t } from '../utils/i18n';
 
 interface ShortcutsPanelProps {
   isOpen: boolean;
@@ -65,47 +64,47 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({
     {
       id: 'new-note',
       type: 'action' as const,
-      title: t('newNote'),
-      description: t('createNewNoteDescription'),
+      title: '新建便签',
+      description: '创建一个新的便签',
       icon: <FileText size={20} />,
       action: () => {},
-      keywords: ['新建', '便签', '创建', 'note', t('newNote').toLowerCase()]
+      keywords: ['新建', '便签', '创建', 'note']
     },
     {
       id: 'search-notes',
       type: 'action' as const,
-      title: t('searchNotes'),
-      description: t('searchExistingNotesDescription'),
+      title: '搜索便签',
+      description: '搜索现有便签',
       icon: <Search size={20} />,
       action: () => {},
-      keywords: ['搜索', '查找', 'search', t('search').toLowerCase()]
+      keywords: ['搜索', '查找', 'search']
     },
     {
       id: 'open-settings',
       type: 'action' as const,
-      title: t('openSettings'),
-      description: t('openAppSettingsDescription'),
+      title: '打开设置',
+      description: '打开应用设置',
       icon: <Settings size={20} />,
       action: () => {},
-      keywords: ['设置', '配置', 'settings', t('settings').toLowerCase()]
+      keywords: ['设置', '配置', 'settings']
     },
     {
       id: 'toggle-theme',
       type: 'action' as const,
-      title: t('toggleTheme'),
-      description: t('toggleAppThemeDescription'),
+      title: '切换主题',
+      description: '切换应用主题',
       icon: <Palette size={20} />,
       action: () => {},
-      keywords: ['主题', '切换', 'theme', t('theme').toLowerCase()]
+      keywords: ['主题', '切换', 'theme']
     },
     {
       id: 'export-data',
       type: 'action' as const,
-      title: t('exportData'),
-      description: t('exportNoteDataDescription'),
+      title: '导出数据',
+      description: '导出便签数据',
       icon: <Download size={20} />,
       action: () => {},
-      keywords: ['导出', '备份', 'export', t('export').toLowerCase()]
+      keywords: ['导出', '备份', 'export']
     }
   ];
 
@@ -119,7 +118,7 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({
             <input
               ref={inputRef}
               type="text"
-              placeholder={t('enterCommandOrSearch')}
+              placeholder="输入命令或搜索..."
               value={searchQuery}
               onChange={(e) => onSearch(e.target.value)}
               onKeyDown={onKeyDown}
@@ -127,11 +126,11 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({
             />
             <div className="flex items-center gap-1 text-xs text-gray-400">
               <kbd className="px-2 py-1 bg-gray-200 rounded border border-gray-300">↑↓</kbd>
-              <span>{t('navigate')}</span>
+              <span>导航</span>
               <kbd className="px-2 py-1 bg-gray-200 rounded border border-gray-300 ml-2">Enter</kbd>
-              <span>{t('select')}</span>
+              <span>选择</span>
               <kbd className="px-2 py-1 bg-gray-200 rounded border border-gray-300 ml-2">ESC</kbd>
-              <span>{t('close')}</span>
+              <span>关闭</span>
             </div>
           </div>
         </div>
@@ -141,8 +140,8 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({
           {displayItems.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <Search size={48} className="mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium mb-2">{t('noCommandsFound')}</p>
-              <p className="text-sm">{t('tryOtherKeywords')}</p>
+              <p className="text-lg font-medium mb-2">没有找到相关命令</p>
+              <p className="text-sm">尝试使用其他关键词</p>
             </div>
           ) : (
             <div className="py-2">
@@ -190,12 +189,12 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({
         <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center gap-4">
-              <span>{t('quickActionPanel')}</span>
+              <span>快速操作面板</span>
               <span>•</span>
-              <span>{t('pressCtrlKToOpen')}</span>
+              <span>按 <kbd className="px-1 py-0.5 bg-white rounded border border-gray-300">Ctrl+K</kbd> 随时打开</span>
             </div>
             {searchQuery && (
-              <span>{t('foundResults', { count: displayItems.length })}</span>
+              <span>找到 {displayItems.length} 个结果</span>
             )}
           </div>
         </div>

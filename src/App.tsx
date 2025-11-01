@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Home,
   Search,
@@ -42,28 +42,15 @@ import {
 import { useShortcuts } from './hooks/useShortcuts';
 import { useSettings } from './hooks/useSettings';
 import { useNotifications } from './hooks/useNotifications';
-import { useDialog } from './hooks/useDialog';
 import ShortcutsPanel from './components/ShortcutsPanel';
 import Settings from './components/Settings';
 import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
-import { getTagTextColor, getTagBorderColor } from './utils/colorContrast';
-import { t } from './utils/i18n';
-
-  const formatDate = (date: Date, language: 'zh' | 'en' = 'zh'): string => {
-  const locale = language === 'zh' ? 'zh-CN' : 'en-US';
-  return new Intl.DateTimeFormat(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date);
-};
+import { getTagTextColor } from './utils/colorContrast';
+import { isTauriApp, tauriAPI } from './utils/tauri';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
-  const [viewingNote, setViewingNote] = useState<Note | null>(null);
   const [editingNote, setEditingNote] = useState<EditingNote>({
     content: '',
     tags: [],
@@ -77,24 +64,6 @@ function App() {
   const [newTagInput, setNewTagInput] = useState('');
   const [newTagColor, setNewTagColor] = useState('#3b82f6');
   const [showTagCreator, setShowTagCreator] = useState(false);
-  const [currentLanguage, setCurrentLanguage] = useState<'zh' | 'en'>('zh');
-
-  // 在组件内部定义 getStatusText 函数，确保能访问最新的语言状态
-  const getStatusText = (status: string): string => {
-    // 根据当前语言状态进行翻译
-    switch (status) {
-      case 'draft':
-        return currentLanguage === 'zh' ? '草稿' : 'Draft';
-      case 'saved':
-        return currentLanguage === 'zh' ? '已保存' : 'Saved';
-      case 'reviewed':
-        return currentLanguage === 'zh' ? '已回顾' : 'Reviewed';
-      case 'reused':
-        return currentLanguage === 'zh' ? '已复用' : 'Reused';
-      default:
-        return status;
-    }
-  };
 
   // 设置和快捷键系统
   const {
@@ -122,8 +91,8 @@ function App() {
 
       downloadFile(exportedData, filename, mimeType);
     } catch (error) {
-      console.error('Export data failed:', error);
-      showErrorNotification(t('exportFailed'), t('errorRetry'));
+      console.error('导出数据失败:', error);
+      showError('导出失败', '请重试');
     }
   };
 
@@ -166,7 +135,7 @@ function App() {
   const {
     notifications,
     isPanelOpen,
-    showError: showErrorNotification,
+    showError,
     showAchievement,
     removeNotification,
     clearNotifications
@@ -176,103 +145,15 @@ function App() {
     enablePanel: true
   });
 
-  // 现代弹窗系统
-  const { showConfirm, showError, showSuccess, DialogComponent } = useDialog();
-
-  // 添加刷新触发器状态
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
   // 加载数据
   const notes = useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray());
   const tags = useLiveQuery(() => db.tags.orderBy('createdAt').toArray());
-  const allTagsForView = useLiveQuery(() => db.tags.toArray());
-  // 优化等级查询：使用 toArray() 代替 get() 以更好地监听变化，并添加刷新触发器
-  const userPointsList = useLiveQuery(
-    () => db.userPoints.where('id').equals(1).toArray(),
-    [refreshTrigger] // 依赖项，当 refreshTrigger 变化时重新查询
-  );
-  const userPoints = userPointsList?.[0]; // 获取第一条记录
+  const userPoints = useLiveQuery(() => db.userPoints.get(1));
   const recentActivities = useLiveQuery(() =>
     db.activities.orderBy('timestamp').reverse().limit(10).toArray()
   );
 
   
-  // 强制刷新等级显示的函数
-  const refreshUserPoints = useCallback(() => {
-    setRefreshTrigger(prev => prev + 1);
-  }, []);
-
-  // 触发等级提升动画
-  const triggerLevelUpAnimation = useCallback((newLevel: number) => {
-    // 使用 newLevel 参数避免未使用变量警告
-    void newLevel;
-    // 桌面端等级显示动画
-    const desktopLevelDisplay = document.getElementById('desktop-level-display');
-    if (desktopLevelDisplay) {
-      desktopLevelDisplay.classList.remove('animate-pulse-once', 'level-up-animation');
-      void desktopLevelDisplay.offsetWidth; // 强制重排
-      desktopLevelDisplay.classList.add('level-up-animation');
-
-      setTimeout(() => {
-        desktopLevelDisplay.classList.remove('level-up-animation');
-        desktopLevelDisplay.classList.add('animate-pulse-once');
-      }, 800);
-    }
-
-    // 移动端等级显示动画
-    const mobileLevelDisplay = document.getElementById('mobile-level-display');
-    if (mobileLevelDisplay) {
-      mobileLevelDisplay.classList.remove('animate-pulse-once', 'level-up-animation');
-      void mobileLevelDisplay.offsetWidth; // 强制重排
-      mobileLevelDisplay.classList.add('level-up-animation');
-
-      setTimeout(() => {
-        mobileLevelDisplay.classList.remove('level-up-animation');
-        mobileLevelDisplay.classList.add('animate-pulse-once');
-      }, 800);
-    }
-  }, []);
-
-  // 监听语言变更事件
-  useEffect(() => {
-    const handleLanguageChange = (event: CustomEvent) => {
-      setCurrentLanguage(event.detail);
-    };
-
-    window.addEventListener('languagechange', handleLanguageChange as EventListener);
-
-    // 初始化语言设置
-    const savedLanguage = localStorage.getItem('language') as 'zh' | 'en';
-    if (savedLanguage) {
-      setCurrentLanguage(savedLanguage);
-    } else {
-      // 如果没有保存的语言，强制设置为中文
-      setCurrentLanguage('zh');
-    }
-
-    return () => {
-      window.removeEventListener('languagechange', handleLanguageChange as EventListener);
-    };
-  }, []);
-
-  // ESC键全局处理
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (viewingNote) {
-          e.preventDefault();
-          setViewingNote(null);
-          setCurrentView('home');
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [viewingNote]);
-
   // 初始化
   useEffect(() => {
     const initializeApp = async () => {
@@ -314,7 +195,7 @@ function App() {
   // 创建或更新便签
   const saveNote = async () => {
     if (!editingNote.content || !editingNote.content.trim()) {
-      showErrorNotification(t('errorContentEmpty'), t('errorFillNoteContent'));
+      showError('内容为空', '请填写便签内容');
       return;
     }
 
@@ -345,19 +226,7 @@ function App() {
       };
       await db.notes.add(newNote);
       
-      const pointsResult = await addPoints(1, 'note_created', { noteId: newNote.id });
-
-      // 强制刷新等级显示
-      refreshUserPoints();
-
-      // 检查是否升级了
-      if (pointsResult.leveledUp) {
-        triggerLevelUpAnimation(pointsResult.newLevel);
-        showSuccess(
-          '🎉 ' + t('levelUp'),
-          t('congratsLevelUp', { level: pointsResult.newLevel })
-        );
-      }
+      await addPoints(1, 'note_created', { noteId: newNote.id });
       
       const unlockedAchievements = await checkAchievements();
       if (unlockedAchievements.length > 0) {
@@ -386,33 +255,14 @@ function App() {
     setCurrentView('home');
   };
 
-  const viewNote = (note: Note) => {
-    let content = note.content;
-
-    if (note.isPrivate) {
-      try {
-        content = decryptContent(content);
-      } catch (error) {
-        showError(t('decryptFailed'), t('incorrectKey'));
-        return;
-      }
-    }
-
-    setViewingNote({
-      ...note,
-      content
-    });
-    setCurrentView('view');
-  };
-
   const editNote = (note: Note) => {
     let content = note.content;
-
+    
     if (note.isPrivate) {
       try {
         content = decryptContent(content);
       } catch (error) {
-        showError(t('decryptFailed'), t('incorrectKey'));
+        alert('解密失败，可能密钥不正确');
         return;
       }
     }
@@ -426,18 +276,14 @@ function App() {
   };
 
   const deleteNote = async (id: string) => {
-    showConfirm(
-      t('deleteNote'),
-      t('confirmDeleteNote'),
-      async () => {
-        try {
-          await db.notes.delete(id);
-        } catch (error) {
-          console.error('删除便签失败:', error);
-          showErrorNotification(t('deleteFailed'), t('errorRetry'));
-        }
+    if (window.confirm('确定要删除这条便签吗？')) {
+      try {
+        await db.notes.delete(id);
+      } catch (error) {
+        console.error('删除便签失败:', error);
+        showError('删除失败', '请重试');
       }
-    );
+    }
   };
 
   const markAsReviewed = async (note: Note) => {
@@ -445,19 +291,7 @@ function App() {
       status: 'reviewed',
       lastReviewedAt: new Date()
     });
-    const pointsResult = await addPoints(2, 'note_reviewed', { noteId: note.id });
-
-    // 强制刷新等级显示
-    refreshUserPoints();
-
-    // 检查是否升级了
-    if (pointsResult.leveledUp) {
-      triggerLevelUpAnimation(pointsResult.newLevel);
-      showSuccess(
-        '🎉 ' + t('levelUp'),
-        t('congratsLevelUp', { level: pointsResult.newLevel })
-      );
-    }
+    await addPoints(2, 'note_reviewed', { noteId: note.id });
     
     const unlockedAchievements = await checkAchievements();
     if (unlockedAchievements.length > 0) {
@@ -516,13 +350,9 @@ function App() {
   };
 
   const deleteTag = async (id: string) => {
-    showConfirm(
-      t('deleteTag'),
-      t('confirmDeleteTag'),
-      async () => {
-        await db.tags.delete(id);
-      }
-    );
+    if (confirm('确定要删除这个标签吗？相关便签不会被删除。')) {
+      await db.tags.delete(id);
+    }
   };
 
   const addTagToNote = (tagName: string) => {
@@ -571,7 +401,7 @@ function App() {
           }`}
         >
           <Home size={24} />
-          <span className="text-xs mt-1">{t('home')}</span>
+          <span className="text-xs mt-1">主页</span>
         </button>
         
         <button
@@ -581,7 +411,7 @@ function App() {
           }`}
         >
           <Search size={24} />
-          <span className="text-xs mt-1">{t('search')}</span>
+          <span className="text-xs mt-1">搜索</span>
         </button>
 
         <button
@@ -609,7 +439,7 @@ function App() {
           }`}
         >
           <Tag size={24} />
-          <span className="text-xs mt-1">{t('tags')}</span>
+          <span className="text-xs mt-1">标签</span>
         </button>
 
         <button
@@ -619,7 +449,7 @@ function App() {
           }`}
         >
           <SettingsIcon size={24} />
-          <span className="text-xs mt-1">{t('settings')}</span>
+          <span className="text-xs mt-1">设置</span>
         </button>
       </div>
     </div>
@@ -630,7 +460,7 @@ function App() {
     <div className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col">
       <div className="p-6 border-b border-gray-200">
         <h1 className="text-2xl font-bold text-primary-600">Note Revive</h1>
-        <p className="text-sm text-gray-500 mt-1">{t('smartNoteManagement')}</p>
+        <p className="text-sm text-gray-500 mt-1">智能便签管理</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
@@ -643,7 +473,7 @@ function App() {
           }`}
         >
           <Home size={20} />
-          <span className="font-medium">{t('home')}</span>
+          <span className="font-medium">主页</span>
         </button>
 
         <button
@@ -655,7 +485,7 @@ function App() {
           }`}
         >
           <Search size={20} />
-          <span className="font-medium">{t('search')}</span>
+          <span className="font-medium">搜索</span>
         </button>
 
         <button
@@ -667,7 +497,7 @@ function App() {
           }`}
         >
           <Tag size={20} />
-          <span className="font-medium">{t('tags')}</span>
+          <span className="font-medium">标签</span>
         </button>
 
         <button
@@ -679,7 +509,7 @@ function App() {
           }`}
         >
           <Award size={20} />
-          <span className="font-medium">{t('achievements')}</span>
+          <span className="font-medium">成就</span>
         </button>
 
         <button
@@ -691,41 +521,29 @@ function App() {
           }`}
         >
           <SettingsIcon size={20} />
-          <span className="font-medium">{t('settings')}</span>
+          <span className="font-medium">设置</span>
         </button>
       </nav>
 
       <div className="p-4 border-t border-gray-200">
         <div className="bg-gradient-to-r from-primary-500 to-blue-600 rounded-lg p-4 text-white">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium">{t('level')}</span>
-            <span className="text-2xl font-bold animate-pulse-once" id="desktop-level-display">Lv.{userPoints?.level || 1}</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">等级</span>
+            <span className="text-2xl font-bold">Lv.{userPoints?.level || 1}</span>
           </div>
-
-          {/* 升级进度条 */}
-          <div className="mb-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs opacity-90">{t('upgradeProgress')}</span>
-              <span className="text-xs opacity-90">
-                {(userPoints?.totalPoints || 0) % 100}/100
-              </span>
-            </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
-              <div
-                className="bg-white rounded-full h-2 transition-all duration-500 ease-out"
-                style={{ width: `${((userPoints?.totalPoints || 0) % 100)}%` }}
-              />
-            </div>
-          </div>
-
           <div className="flex items-center gap-2">
             <TrendingUp size={16} />
-            <span className="text-sm">{userPoints?.totalPoints || 0} {t('points')}</span>
+            <span className="text-sm">{userPoints?.totalPoints || 0} 积分</span>
           </div>
         </div>
       </div>
     </div>
   );
+
+  // 桌面版标题栏已移除，使用系统默认标题栏
+  const renderDesktopTitleBar = () => {
+    return null;
+  };
 
   // 移动端顶部导航栏（仅在非编辑器视图显示）
   const renderMobileHeader = () => (
@@ -733,8 +551,8 @@ function App() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-primary-600">Note Revive</h1>
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-r from-primary-500 to-blue-600 rounded-lg px-3 py-1 text-white text-sm animate-pulse-once" id="mobile-level-display">
-            {t('grade')}{userPoints?.level || 1} · {userPoints?.totalPoints || 0}{t('pointsUnit')}
+          <div className="bg-gradient-to-r from-primary-500 to-blue-600 rounded-lg px-3 py-1 text-white text-sm">
+            Lv.{userPoints?.level || 1} · {userPoints?.totalPoints || 0}分
           </div>
         </div>
       </div>
@@ -746,8 +564,8 @@ function App() {
     <div className="p-4 md:p-8 pb-20 md:pb-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 md:mb-8 gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">{t('notes')}</h2>
-          <p className="text-gray-500 mt-1 text-sm md:text-base">{t('noteCount', { count: notes?.length || 0 })}</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">我的便签</h2>
+          <p className="text-gray-500 mt-1 text-sm md:text-base">共 {notes?.length || 0} 条便签</p>
         </div>
         <button
           onClick={() => {
@@ -763,25 +581,21 @@ function App() {
           className="hidden md:flex btn-primary items-center gap-2"
         >
           <Plus size={20} />
-          {t('newNote')}
+          新建便签
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {notes?.slice(0, 6).map(note => {
-          const preview = note.isPrivate ? t('privateContentEncrypted') : note.content.substring(0, 50) + (note.content.length > 50 ? '...' : '');
+          const preview = note.isPrivate ? '私密内容已加密' : note.content.substring(0, 50) + (note.content.length > 50 ? '...' : '');
           
           return (
-          <div
-            key={note.id}
-            className="card hover:shadow-md transition-shadow group cursor-pointer"
-            onClick={() => viewNote(note)}
-          >
+          <div key={note.id} className="card hover:shadow-md transition-shadow group">
             <div className="flex items-start justify-between mb-3">
               <h3 className="text-base md:text-lg font-semibold text-gray-900 flex-1 line-clamp-2">{preview}</h3>
               {note.isPrivate && <Lock size={16} className="text-gray-400 mt-1 flex-shrink-0 ml-2" />}
             </div>
-
+            
             <div className="text-sm text-gray-600 mb-4 line-clamp-2 md:line-clamp-3">
               {note.isPrivate ? '' : note.content.substring(50, 150)}
             </div>
@@ -795,8 +609,7 @@ function App() {
                     className="tag-badge text-xs"
                     style={{
                       backgroundColor: tagData?.color || '#3b82f6',
-                      color: getTagTextColor(tagData?.color || '#3b82f6'),
-                      border: '1px solid transparent'
+                      color: getTagTextColor(tagData?.color || '#3b82f6')
                     }}
                   >
                     {tag}
@@ -808,28 +621,27 @@ function App() {
             <div className="flex items-center justify-between text-xs md:text-sm text-gray-500 mb-3">
               <span className="flex items-center gap-1">
                 <Calendar size={14} />
-                {formatDate(new Date(note.updatedAt), currentLanguage)}
+                {new Date(note.updatedAt).toLocaleDateString('zh-CN')}
               </span>
               <span className={`px-2 py-1 rounded text-xs ${
-                note.status === 'saved' ? 'status-badge-saved' :
-                note.status === 'reviewed' ? 'status-badge-reviewed' :
-                note.status === 'reused' ? 'status-badge-reused' :
-                'status-badge-draft'
+                note.status === 'saved' ? 'bg-green-100 text-green-700' :
+                note.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
+                note.status === 'reused' ? 'bg-purple-100 text-purple-700' :
+                'bg-gray-100 text-gray-700'
               }`}>
-                {getStatusText(note.status)}
+                {note.status === 'saved' ? '已保存' :
+                 note.status === 'reviewed' ? '已回顾' :
+                 note.status === 'reused' ? '已复用' : '草稿'}
               </span>
             </div>
 
-            <div
-              className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => editNote(note)}
                 className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 text-sm min-h-[44px]"
               >
                 <Edit size={16} />
-                {t('edit')}
+                编辑
               </button>
               {note.status !== 'reviewed' && (
                 <button
@@ -837,7 +649,7 @@ function App() {
                   className="flex-1 px-3 py-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors flex items-center justify-center gap-2 text-sm min-h-[44px]"
                 >
                   <Eye size={16} />
-                  {t('review')}
+                  回顾
                 </button>
               )}
               <button
@@ -857,8 +669,8 @@ function App() {
           <div className="text-gray-400 mb-4">
             <Plus size={64} className="mx-auto" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">{t('noNotesYet')}</h3>
-          <p className="text-gray-500 mb-6">{t('startRecording')}</p>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">还没有便签</h3>
+          <p className="text-gray-500 mb-6">点击底部加号开始记录你的想法吧</p>
         </div>
       )}
     </div>
@@ -870,12 +682,12 @@ function App() {
 
     return (
       <div className="p-4 md:p-8 pb-20 md:pb-8">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 md:mb-8">{t('searchNotes')}</h2>
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 md:mb-8">搜索便签</h2>
 
         <div className="mb-6 space-y-4">
           <input
             type="text"
-            placeholder={t('searchPlaceholder')}
+            placeholder="搜索内容或标签..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="input-field text-base"
@@ -884,9 +696,9 @@ function App() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setFilterTag('')}
-              className={`tag-badge min-h-[44px] px-4 ${!filterTag ? 'search-tag-active' : 'search-tag-inactive'}`}
+              className={`tag-badge min-h-[44px] px-4 ${!filterTag ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
-              {t('allNotesFilter')}
+              全部
             </button>
             {tags?.map(tag => (
               <button
@@ -906,26 +718,24 @@ function App() {
 
         <div className="space-y-4">
           {filteredNotes.map(note => {
-            const preview = note.isPrivate ? t('encryptedContent') : note.content.substring(0, 60) + (note.content.length > 60 ? '...' : '');
+            const preview = note.isPrivate ? '私密内容已加密' : note.content.substring(0, 60) + (note.content.length > 60 ? '...' : '');
             
             return (
-            <div
-              key={note.id}
-              className="card hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => viewNote(note)}
-            >
+            <div key={note.id} className="card hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <h3 className="text-lg md:text-xl font-semibold text-gray-900 flex items-center gap-2 flex-1">
                   <span className="line-clamp-2">{preview}</span>
                   {note.isPrivate && <Lock size={18} className="text-gray-400 flex-shrink-0" />}
                 </h3>
                 <span className={`px-3 py-1 rounded-full text-xs md:text-sm flex-shrink-0 ml-2 ${
-                  note.status === 'saved' ? 'status-badge-saved' :
-                  note.status === 'reviewed' ? 'status-badge-reviewed' :
-                  note.status === 'reused' ? 'status-badge-reused' :
-                  'status-badge-draft'
+                  note.status === 'saved' ? 'bg-green-100 text-green-700' :
+                  note.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
+                  note.status === 'reused' ? 'bg-purple-100 text-purple-700' :
+                  'bg-gray-100 text-gray-700'
                 }`}>
-                  {getStatusText(note.status)}
+                  {note.status === 'saved' ? '已保存' :
+                   note.status === 'reviewed' ? '已回顾' :
+                   note.status === 'reused' ? '已复用' : '草稿'}
                 </span>
               </div>
 
@@ -955,15 +765,15 @@ function App() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <span className="text-xs md:text-sm text-gray-500 flex items-center gap-1">
                   <Calendar size={14} />
-                  {formatDate(new Date(note.updatedAt), currentLanguage)}
+                  {new Date(note.updatedAt).toLocaleDateString('zh-CN')}
                 </span>
-                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-2">
                   <button
                     onClick={() => editNote(note)}
                     className="flex-1 sm:flex-initial px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors flex items-center justify-center gap-1 text-sm min-h-[44px]"
                   >
                     <Edit size={14} />
-                    {t('editButton')}
+                    编辑
                   </button>
                   {note.status !== 'reviewed' && (
                     <button
@@ -971,7 +781,7 @@ function App() {
                       className="flex-1 sm:flex-initial px-4 py-2 bg-primary-50 text-primary-700 rounded hover:bg-primary-100 transition-colors flex items-center justify-center gap-1 text-sm min-h-[44px]"
                     >
                       <Eye size={14} />
-                      {t('reviewButton')}
+                      回顾
                     </button>
                   )}
                 </div>
@@ -983,8 +793,8 @@ function App() {
           {filteredNotes.length === 0 && (
             <div className="text-center py-16">
               <Search size={64} className="mx-auto text-gray-300 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">{t('noRelatedNotesFound')}</h3>
-              <p className="text-gray-500">{t('tryDifferentKeywords')}</p>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">没有找到相关便签</h3>
+              <p className="text-gray-500">尝试使用其他关键词或标签</p>
             </div>
           )}
         </div>
@@ -995,14 +805,14 @@ function App() {
   // 渲染标签管理页面
   const renderTags = () => (
     <div className="p-4 md:p-8 pb-20 md:pb-8">
-      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 md:mb-8">{t('tagManagementTitle')}</h2>
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 md:mb-8">标签管理</h2>
 
       <div className="card mb-6">
-        <h3 className="text-base md:text-lg font-semibold mb-4">{t('createNewTagTitle')}</h3>
+        <h3 className="text-base md:text-lg font-semibold mb-4">创建新标签</h3>
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
-            placeholder={t('tagName')}
+            placeholder="标签名称"
             value={newTagInput}
             onChange={(e) => setNewTagInput(e.target.value)}
             className="input-field flex-1 text-base"
@@ -1013,8 +823,8 @@ function App() {
             onChange={(e) => setNewTagColor(e.target.value)}
             className="w-full sm:w-20 h-12 rounded-lg cursor-pointer"
           />
-          <button onClick={() => createTag(newTagInput, newTagColor)} className="tag-create-button btn-primary min-h-[48px] sm:min-h-[40px]">
-            {t('createButton')}
+          <button onClick={() => createTag(newTagInput, newTagColor)} className="btn-primary min-h-[48px] sm:min-h-[40px]">
+            创建
           </button>
         </div>
       </div>
@@ -1029,14 +839,11 @@ function App() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
                     className="w-12 h-12 rounded-lg flex-shrink-0"
-                    style={{ 
-                      backgroundColor: tag.color,
-                      border: '1px solid ' + getTagBorderColor(tag.color)
-                    }}
+                    style={{ backgroundColor: tag.color }}
                   />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{tag.name}</h3>
-                    <p className="text-sm text-gray-500">{t('noteCountWithUnit', { count: noteCount })}</p>
+                    <p className="text-sm text-gray-500">{noteCount} 条便签</p>
                   </div>
                 </div>
                 <button
@@ -1054,8 +861,8 @@ function App() {
       {(!tags || tags.length === 0) && (
         <div className="text-center py-16">
           <Tag size={64} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">{t('noTagsYet')}</h3>
-          <p className="text-gray-500">{t('startRecording')}</p>
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">还没有标签</h3>
+          <p className="text-gray-500">创建标签来更好地组织你的便签</p>
         </div>
       )}
     </div>
@@ -1067,7 +874,7 @@ function App() {
 
     return (
       <div className="p-4 md:p-8 pb-20 md:pb-8">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 md:mb-8">{t('achievementSystem')}</h2>
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6 md:mb-8">成就系统</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
           {ACHIEVEMENTS.map(achievement => {
@@ -1076,10 +883,10 @@ function App() {
             return (
               <div 
                 key={achievement.id} 
-                className={`card achievement-card ${unlocked ? 'border-2 border-primary-500' : 'opacity-60'}`}
+                className={`card ${unlocked ? 'border-2 border-primary-500' : 'opacity-60'}`}
               >
                 <div className="flex items-start gap-4 mb-4">
-                  <div className={`p-3 rounded-lg ${unlocked ? 'achievement-icon-unlocked' : 'achievement-icon-locked'} flex-shrink-0`}>
+                  <div className={`p-3 rounded-lg ${unlocked ? 'bg-primary-100' : 'bg-gray-100'} flex-shrink-0`}>
                     <Award size={28} className={unlocked ? 'text-primary-600' : 'text-gray-400'} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1090,11 +897,11 @@ function App() {
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-primary-600">
-                    +{achievement.pointsReward} {t('pointsReward')}
+                    +{achievement.pointsReward} 积分
                   </span>
                   {unlocked && (
                     <span className="px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
-                      {t('unlocked')}
+                      已解锁
                     </span>
                   )}
                 </div>
@@ -1104,7 +911,7 @@ function App() {
         </div>
 
         <div className="card">
-          <h3 className="text-base md:text-lg font-semibold mb-4">{t('recentActivities')}</h3>
+          <h3 className="text-base md:text-lg font-semibold mb-4">最近活动</h3>
           <div className="space-y-3">
             {recentActivities?.map(activity => (
               <div key={activity.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
@@ -1121,13 +928,13 @@ function App() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {activity.type === 'note_created' && t('activityNoteCreated')}
-                      {activity.type === 'note_reviewed' && t('activityNoteReviewed')}
-                      {activity.type === 'achievement_unlocked' && t('activityAchievementUnlocked')}
-                      {activity.type === 'note_reused' && t('activityNoteReused')}
+                      {activity.type === 'note_created' && '创建便签'}
+                      {activity.type === 'note_reviewed' && '回顾便签'}
+                      {activity.type === 'achievement_unlocked' && '解锁成就'}
+                      {activity.type === 'note_reused' && '复用便签'}
                     </p>
                     <p className="text-xs text-gray-500 truncate">
-                      {formatDate(new Date(activity.timestamp), currentLanguage)}
+                      {new Date(activity.timestamp).toLocaleString('zh-CN')}
                     </p>
                   </div>
                 </div>
@@ -1136,147 +943,8 @@ function App() {
             ))}
 
             {(!recentActivities || recentActivities.length === 0) && (
-              <p className="text-center text-gray-500 py-8">{t('noActivitiesYet')}</p>
+              <p className="text-center text-gray-500 py-8">还没有活动记录</p>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // 渲染便签详情查看
-  const renderNoteView = () => {
-    // 将 hook 的使用移到组件顶部，确保每次渲染时 hooks 的顺序一致
-    // allTagsForView 已经在组件顶部定义
-    const noteTags = (allTagsForView || []).filter(tag => viewingNote?.tags.includes(tag.id || '') || false);
-
-    // 如果不是 view 视图或者没有正在查看的便签，返回 null
-    if (currentView !== 'view' || !viewingNote) return null;
-
-    return (
-      <div className="h-full flex flex-col bg-white">
-        {/* 头部工具栏 */}
-        <div className="bg-white border-b border-gray-200 p-3 md:p-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1">
-            <button
-              onClick={() => {
-                setViewingNote(null);
-                setCurrentView('home');
-              }}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              title={t('backToHome')}
-            >
-              <X size={20} />
-            </button>
-            <h2 className="text-lg md:text-xl font-semibold text-gray-800 truncate">{t('noteDetails')}</h2>
-          </div>
-          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-            {viewingNote.isPrivate && (
-              <div className="p-2 bg-yellow-100 text-yellow-700 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center" title={t('privateNote')}>
-                <Lock size={20} />
-              </div>
-            )}
-            <button
-              onClick={() => editNote(viewingNote)}
-              className="p-2 bg-primary-100 text-primary-700 rounded-lg hover:bg-primary-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              title={t('editNote')}
-            >
-              <Edit size={20} />
-            </button>
-            <button
-              onClick={() => {
-                showConfirm(
-                  t('deleteNote'),
-                  t('confirmDeleteNotePermanently'),
-                  () => {
-                    if (viewingNote.id) {
-                      db.notes.delete(viewingNote.id);
-                      setViewingNote(null);
-                      setCurrentView('home');
-                      showSuccess(t('deleteSuccess'), t('noteDeleted'));
-                    }
-                  }
-                );
-              }}
-              className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              title={t('delete')}
-            >
-              <Trash2 size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* 便签信息 */}
-            <div className="mb-6">
-              <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                <span className="flex items-center gap-1">
-                  <Calendar size={16} />
-                  {formatDate(viewingNote.createdAt, currentLanguage)}
-                </span>
-                {viewingNote.updatedAt.getTime() !== viewingNote.createdAt.getTime() && (
-                  <span>{t('updatedAt')} {formatDate(viewingNote.updatedAt, currentLanguage)}</span>
-                )}
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  viewingNote.status === 'saved' ? 'status-badge-saved' :
-                  viewingNote.status === 'reviewed' ? 'status-badge-reviewed' :
-                  viewingNote.status === 'reused' ? 'status-badge-reused' :
-                  'status-badge-draft'
-                }`}>
-                  {getStatusText(viewingNote.status)}
-                </span>
-              </div>
-
-              {/* 标签 */}
-              {noteTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {noteTags.map(tag => (
-                    <span
-                      key={tag.id}
-                      className="px-3 py-1 rounded-full text-sm font-medium"
-                      style={{
-                        backgroundColor: tag.color,
-                        color: getTagTextColor(tag.color)
-                      }}
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 便签内容 */}
-            <div className="prose prose-sm md:prose-base lg:prose-lg max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  h1: ({children}) => <h1 className="text-2xl font-bold mb-4 text-gray-900">{children}</h1>,
-                  h2: ({children}) => <h2 className="text-xl font-bold mb-3 text-gray-900">{children}</h2>,
-                  h3: ({children}) => <h3 className="text-lg font-bold mb-2 text-gray-900">{children}</h3>,
-                  p: ({children}) => <p className="mb-4 text-gray-700 leading-relaxed">{children}</p>,
-                  ul: ({children}) => <ul className="list-disc pl-6 mb-4 text-gray-700">{children}</ul>,
-                  ol: ({children}) => <ol className="list-decimal pl-6 mb-4 text-gray-700">{children}</ol>,
-                  li: ({children}) => <li className="mb-2 text-gray-700">{children}</li>,
-                  blockquote: ({children}) => (
-                    <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>
-                  ),
-                  code: ({inline, className, children}: any) => {
-                    // 使用 className 避免未使用变量警告
-                    void className; // 避免未使用变量警告
-                    return inline ?
-                      <code className="bg-gray-100 px-1 py-0.5 rounded text-sm text-gray-800">{children}</code> :
-                      <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
-                        <code className="text-sm text-gray-800">{children}</code>
-                      </pre>;
-                  },
-                }}
-              >
-                {viewingNote.content}
-              </ReactMarkdown>
-            </div>
           </div>
         </div>
       </div>
@@ -1288,7 +956,7 @@ function App() {
     <div className="h-screen flex flex-col">
       <div className="bg-white border-b border-gray-200 p-3 md:p-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1">
-          <h2 className="text-lg md:text-xl font-semibold text-gray-800">{t('quickRecordTitle')}</h2>
+          <h2 className="text-lg md:text-xl font-semibold text-gray-800">快速记录</h2>
         </div>
         <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <button
@@ -1298,7 +966,7 @@ function App() {
                 ? 'bg-primary-100 text-primary-700' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
-            title={editingNote.isPrivate ? t('private') : t('public')}
+            title={editingNote.isPrivate ? '私密' : '公开'}
           >
             {editingNote.isPrivate ? <Lock size={20} /> : <Unlock size={20} />}
           </button>
@@ -1327,7 +995,7 @@ function App() {
           <button
             onClick={() => setEditorMode(editorMode === 'split' ? 'edit' : 'split')}
             className="hidden md:flex p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors min-h-[44px] min-w-[44px] items-center justify-center"
-            title={editorMode === 'split' ? t('hidePreview') : t('showPreview')}
+            title={editorMode === 'split' ? '隐藏预览' : '显示预览'}
           >
             {editorMode === 'split' ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
@@ -1337,7 +1005,7 @@ function App() {
             className="btn-primary flex items-center gap-1 md:gap-2 min-h-[44px] px-3 md:px-4"
           >
             <Save size={20} />
-            <span className="hidden sm:inline">{t('save')}</span>
+            <span className="hidden sm:inline">保存</span>
           </button>
           <button
             onClick={() => {
@@ -1367,7 +1035,7 @@ function App() {
           'w-full'
         }`}>
           <textarea
-            placeholder={t('noteInputPlaceholder')}
+            placeholder="在此输入便签内容（支持Markdown格式）..."
             value={editingNote.content}
             onChange={(e) => setEditingNote({ ...editingNote, content: e.target.value })}
             className="w-full h-full p-4 md:p-6 outline-none resize-none font-mono text-sm md:text-base"
@@ -1379,22 +1047,22 @@ function App() {
           <div className={`${editorMode === 'split' ? 'w-1/2' : 'w-full'} p-4 md:p-6 bg-gray-50 overflow-y-auto`}>
             <div className="markdown-preview text-sm md:text-base">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {editingNote.content || t('previewArea')}
+                {editingNote.content || '*预览区域*'}
               </ReactMarkdown>
             </div>
           </div>
         )}
       </div>
 
-      {/* Tag Management Area */}
+      {/* 标签管理区域 - 移到编辑器底部 */}
       <div className="border-t border-gray-200 bg-white">
         <div className="p-3 md:p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <Tag size={16} />
-            {t('tagManagement')}
+            标签管理
           </h3>
           
-          {/* Current Note Tags */}
+          {/* 当前便签的标签 */}
           <div className="flex flex-wrap gap-2 mb-4">
             {editingNote.tags?.map(tag => {
               const tagData = tags?.find(t => t.name === tag);
@@ -1404,15 +1072,14 @@ function App() {
                   className="tag-badge flex items-center gap-1 min-h-[36px] px-3"
                   style={{
                     backgroundColor: tagData?.color || '#3b82f6',
-                    color: getTagTextColor(tagData?.color || '#3b82f6'),
-                    border: '1px solid transparent'
+                    color: getTagTextColor(tagData?.color || '#3b82f6')
                   }}
                 >
                   {tag}
                   <button
                     onClick={() => removeTagFromNote(tag)}
                     className="hover:bg-white/20 rounded-full p-0.5 min-h-[24px] min-w-[24px] flex items-center justify-center"
-                    title={t('deleteTag')}
+                    title="删除标签"
                   >
                     <X size={14} />
                   </button>
@@ -1421,13 +1088,13 @@ function App() {
             })}
             
             {(!editingNote.tags || editingNote.tags.length === 0) && (
-              <span className="text-sm text-gray-500 italic">{t('noTagsYet')}</span>
+              <span className="text-sm text-gray-500 italic">还没有标签</span>
             )}
           </div>
           
-          {/* Tag Operations Area */}
+          {/* 标签操作区域 */}
           <div className="space-y-3">
-            {/* Existing Tags Select */}
+            {/* 现有标签选择 */}
             <div className="flex gap-2">
               <select
                 onChange={(e) => {
@@ -1438,7 +1105,7 @@ function App() {
                 }}
                 className="input-field text-base min-h-[44px] flex-1"
               >
-                <option value="">{t('selectExistingTag')}</option>
+                <option value="">从现有标签中选择...</option>
                 {tags?.filter(tag => !editingNote.tags?.includes(tag.name)).map(tag => (
                   <option key={tag.id} value={tag.name}>{tag.name}</option>
                 ))}
@@ -1449,17 +1116,17 @@ function App() {
                 className="btn-secondary min-h-[44px] px-4 flex items-center gap-2"
               >
                 <Plus size={16} />
-                <span className="hidden sm:inline">{t('createNewTag')}</span>
+                <span className="hidden sm:inline">新建标签</span>
               </button>
             </div>
             
-            {/* Tag Creator */}
+            {/* 标签创建器 */}
             {showTagCreator && (
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                 <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="text"
-                    placeholder={t('tagName')}
+                    placeholder="标签名称"
                     value={newTagInput}
                     onChange={(e) => setNewTagInput(e.target.value)}
                     className="input-field flex-1 text-base min-h-[44px]"
@@ -1476,14 +1143,14 @@ function App() {
                       value={newTagColor}
                       onChange={(e) => setNewTagColor(e.target.value)}
                       className="w-12 h-12 rounded-lg cursor-pointer border border-gray-300"
-                      title={t('selectTagColor')}
+                      title="选择标签颜色"
                     />
                     <button
                       onClick={() => {
                         setNewTagColor(getRandomColor());
                       }}
                       className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors min-h-[44px] flex items-center justify-center"
-                      title={t('randomColorButton')}
+                      title="随机颜色"
                     >
                       <span className="text-sm">🎲</span>
                     </button>
@@ -1492,19 +1159,19 @@ function App() {
                       className="btn-primary min-h-[44px] px-4"
                       disabled={!newTagInput.trim()}
                     >
-                      {t('addButton')}
+                      添加
                     </button>
                   </div>
                 </div>
                 
                 {/* 颜色预览 */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">{t('preview')}:</span>
+                  <span className="text-sm text-gray-600">预览：</span>
                   <div
                     className="w-8 h-8 rounded border-2 border-white shadow-sm"
                     style={{ backgroundColor: newTagColor }}
                   />
-                  <span className="text-sm text-gray-700">{newTagInput || t('tagName')}</span>
+                  <span className="text-sm text-gray-700">{newTagInput || '标签名称'}</span>
                 </div>
               </div>
             )}
@@ -1522,9 +1189,9 @@ function App() {
           <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Eye size={32} className="text-primary-600" />
           </div>
-          <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">{t('reviewTimeArrived')}</h3>
+          <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">回顾时间到了</h3>
           <p className="text-sm md:text-base text-gray-600">
-            {t('reviewReminderDescription')}
+            你有一些超过7天未回顾的便签，现在回顾可以获得额外积分哦！
           </p>
         </div>
 
@@ -1536,13 +1203,13 @@ function App() {
             }}
             className="btn-primary flex-1 min-h-[48px]"
           >
-            {t('goReview')}
+            去回顾
           </button>
           <button
             onClick={() => setShowReviewReminder(false)}
             className="btn-secondary flex-1 min-h-[48px]"
           >
-            {t('remindLater')}
+            稍后提醒
           </button>
         </div>
       </div>
@@ -1551,9 +1218,10 @@ function App() {
 
   return (
     <div className="h-screen flex bg-gray-50">
-      {currentView !== 'editor' && currentView !== 'view' && renderSidebar()}
-      <div className={`flex-1 flex flex-col overflow-hidden ${currentView === 'editor' || currentView === 'view' ? 'w-full' : ''}`}>
-        {currentView !== 'editor' && currentView !== 'view' && renderMobileHeader()}
+      {currentView !== 'editor' && renderSidebar()}
+      <div className={`flex-1 flex flex-col overflow-hidden ${currentView === 'editor' ? 'w-full' : ''}`}>
+        {renderDesktopTitleBar()}
+        {currentView !== 'editor' && renderMobileHeader()}
         <div className="flex-1 overflow-y-auto">
           {currentView === 'home' && renderHome()}
           {currentView === 'search' && renderSearch()}
@@ -1567,13 +1235,14 @@ function App() {
                   updateSettings({ theme });
                 }
               }}
+              onShowAbout={tauriAPI.showAbout}
+              isDesktopApp={isTauriApp()}
             />
           )}
-          {renderNoteView()}
           {currentView === 'editor' && renderEditor()}
         </div>
       </div>
-      {currentView !== 'editor' && currentView !== 'settings' && currentView !== 'view' && renderMobileNav()}
+      {currentView !== 'editor' && currentView !== 'settings' && renderMobileNav()}
       {showReviewReminder && renderReviewReminder()}
 
       {/* 快捷方式面板 */}
@@ -1612,9 +1281,6 @@ function App() {
           />
         ))
       }
-
-      {/* 现代弹窗组件 */}
-      <DialogComponent />
     </div>
   );
 }
