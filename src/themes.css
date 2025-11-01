@@ -28,29 +28,29 @@
   --color-primary-900: #0c4a6e;
 }
 
-/* 暗色主题 - 深灰色调 */
+/* 暗色主题 - 高对比度配置 */
 [data-theme="dark"] {
-  --color-primary-50: #1a1f2e;
-  --color-primary-100: #252b3b;
-  --color-primary-200: #2d3748;
-  --color-primary-300: #4a5568;
-  --color-primary-400: #718096;
-  --color-primary-500: #a0aec0;
-  --color-primary-600: #cbd5e0;
-  --color-primary-700: #e2e8f0;
-  --color-primary-800: #edf2f7;
-  --color-primary-900: #f7fafc;
+  --color-primary-50: #334155;    /* 适中的深色 */
+  --color-primary-100: #475569;  /* 适中的深色 */
+  --color-primary-200: #64748b;  /* 适中的中色 */
+  --color-primary-300: #94a3b8;  /* 适中的浅色 */
+  --color-primary-400: #cbd5e1;  /* 较亮的浅色 */
+  --color-primary-500: #e2e8f0;  /* 亮的浅色 */
+  --color-primary-600: #f1f5f9;  /* 很亮的浅色 */
+  --color-primary-700: #ffffff;  /* 白色 */
+  --color-primary-800: #ffffff;  /* 白色 */
+  --color-primary-900: #ffffff;  /* 白色 */
 
-  /* 扩展暗色主题变量 */
-  --color-bg-primary: #1a1f2e;
-  --color-bg-secondary: #252b3b;
-  --color-bg-tertiary: #2d3748;
-  --color-text-primary: #e2e8f0;
-  --color-text-secondary: #a0aec0;
-  --color-text-tertiary: #718096;
-  --color-border: #4a5568;
-  --color-border-hover: #718096;
-  --color-shadow: rgba(0, 0, 0, 0.3);
+  /* 扩展暗色主题变量 - 增强对比度 */
+  --color-bg-primary: #1e293b;
+  --color-bg-secondary: #334155;
+  --color-bg-tertiary: #475569;
+  --color-text-primary: #f8fafc;   /* 很亮的白色 */
+  --color-text-secondary: #e2e8f0; /* 浅灰色 */
+  --color-text-tertiary: #cbd5e1;  /* 中浅灰色 */
+  --color-border: #64748b;         /* 边框颜色 */
+  --color-border-hover: #94a3b8;    /* 边框悬停颜色 */
+  --color-shadow: rgba(0, 0, 0, 0.4);
 }
 
 /* 蓝色主题 */
@@ -254,6 +254,11 @@
   box-shadow: 0 1px 2px 0 var(--color-shadow);
 }
 
+/* 增强暗色主题下标签的对比度 */
+[data-theme="dark"] .tag-badge {
+  border: 1px solid var(--color-border);
+}
+
 /* Markdown预览样式适配 */
 [data-theme="dark"] .markdown-preview {
   color: var(--color-text-primary);
@@ -294,6 +299,15 @@
 /* 暗色主题下特定组件的增强对比度 */
 [data-theme="dark"] .bg-gray-50 {
   background-color: #374151 !important;
+}
+
+/* 暗色主题下标签颜色增强 */
+[data-theme="dark"] .tag-badge.text-white {
+  color: #f3f4f6 !important;
+}
+
+[data-theme="dark"] .tag-badge.text-black {
+  color: #1f2937 !important;
 }
 
 [data-theme="dark"] .bg-gray-50,
@@ -359,6 +373,96 @@
 
 [data-theme="dark"] .card * {
   color: #f3f4f6 !important;
+}
+
+/* 暗色主题状态标签增强样式 */
+[data-theme="dark"] .status-badge-saved {
+  background-color: rgba(34, 197, 94, 0.9) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(34, 197, 94, 0.8) !important;
+}
+
+[data-theme="dark"] .status-badge-reviewed {
+  background-color: rgba(59, 130, 246, 0.9) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(59, 130, 246, 0.8) !important;
+}
+
+[data-theme="dark"] .status-badge-reused {
+  background-color: rgba(147, 51, 234, 0.9) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(147, 51, 234, 0.8) !important;
+}
+
+[data-theme="dark"] .status-badge-draft {
+  background-color: rgba(156, 163, 175, 0.9) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(156, 163, 175, 0.8) !important;
+}
+
+/* 暗色主题搜索标签增强样式 */
+[data-theme="dark"] .search-tag-active {
+  background-color: var(--color-primary-600) !important;
+  color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-primary-500) !important;
+}
+
+[data-theme="dark"] .search-tag-inactive {
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+/* 标签管理页面创建按钮 */
+[data-theme="dark"] .tag-create-button {
+  background-color: var(--color-primary-600) !important;
+  color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-primary-500) !important;
+}
+
+[data-theme="dark"] .tag-create-button:hover {
+  background-color: var(--color-primary-500) !important;
+  border-color: var(--color-primary-400) !important;
+}
+
+/* 暗色主题下的导出按钮 */
+[data-theme="dark"] .export-button {
+  background-color: var(--color-primary-600) !important;
+  color: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-primary-500) !important;
+}
+
+[data-theme="dark"] .export-button:hover {
+  background-color: var(--color-primary-500) !important;
+  border-color: var(--color-primary-400) !important;
+}
+
+/* 暗色主题成就图标增强样式 */
+[data-theme="dark"] .achievement-icon-unlocked {
+  background-color: var(--color-primary-100) !important;
+  color: var(--color-primary-700) !important;
+}
+
+[data-theme="dark"] .achievement-icon-locked {
+  background-color: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme="dark"] .achievement-icon-locked .text-gray-400 {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .achievement-card {
+  background-color: var(--color-bg-secondary) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme="dark"] .achievement-card * {
+  color: var(--color-text-primary) !important;
+}
+
+[data-theme="dark"] .achievement-card .text-gray-600 {
+  color: var(--color-text-secondary) !important;
 }
 
 /* 旧版.dark类兼容性 */

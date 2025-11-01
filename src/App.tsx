@@ -46,7 +46,7 @@ import { useDialog } from './hooks/useDialog';
 import ShortcutsPanel from './components/ShortcutsPanel';
 import Settings from './components/Settings';
 import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
-import { getTagTextColor } from './utils/colorContrast';
+import { getTagTextColor, getTagBorderColor } from './utils/colorContrast';
 import { t } from './utils/i18n';
 
   const formatDate = (date: Date, language: 'zh' | 'en' = 'zh'): string => {
@@ -795,7 +795,8 @@ function App() {
                     className="tag-badge text-xs"
                     style={{
                       backgroundColor: tagData?.color || '#3b82f6',
-                      color: getTagTextColor(tagData?.color || '#3b82f6')
+                      color: getTagTextColor(tagData?.color || '#3b82f6'),
+                      border: '1px solid transparent'
                     }}
                   >
                     {tag}
@@ -810,10 +811,10 @@ function App() {
                 {formatDate(new Date(note.updatedAt), currentLanguage)}
               </span>
               <span className={`px-2 py-1 rounded text-xs ${
-                note.status === 'saved' ? 'bg-green-100 text-green-700' :
-                note.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
-                note.status === 'reused' ? 'bg-purple-100 text-purple-700' :
-                'bg-gray-100 text-gray-700'
+                note.status === 'saved' ? 'status-badge-saved' :
+                note.status === 'reviewed' ? 'status-badge-reviewed' :
+                note.status === 'reused' ? 'status-badge-reused' :
+                'status-badge-draft'
               }`}>
                 {getStatusText(note.status)}
               </span>
@@ -883,7 +884,7 @@ function App() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setFilterTag('')}
-              className={`tag-badge min-h-[44px] px-4 ${!filterTag ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`tag-badge min-h-[44px] px-4 ${!filterTag ? 'search-tag-active' : 'search-tag-inactive'}`}
             >
               {t('allNotesFilter')}
             </button>
@@ -919,10 +920,10 @@ function App() {
                   {note.isPrivate && <Lock size={18} className="text-gray-400 flex-shrink-0" />}
                 </h3>
                 <span className={`px-3 py-1 rounded-full text-xs md:text-sm flex-shrink-0 ml-2 ${
-                  note.status === 'saved' ? 'bg-green-100 text-green-700' :
-                  note.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
-                  note.status === 'reused' ? 'bg-purple-100 text-purple-700' :
-                  'bg-gray-100 text-gray-700'
+                  note.status === 'saved' ? 'status-badge-saved' :
+                  note.status === 'reviewed' ? 'status-badge-reviewed' :
+                  note.status === 'reused' ? 'status-badge-reused' :
+                  'status-badge-draft'
                 }`}>
                   {getStatusText(note.status)}
                 </span>
@@ -1012,7 +1013,7 @@ function App() {
             onChange={(e) => setNewTagColor(e.target.value)}
             className="w-full sm:w-20 h-12 rounded-lg cursor-pointer"
           />
-          <button onClick={() => createTag(newTagInput, newTagColor)} className="btn-primary min-h-[48px] sm:min-h-[40px]">
+          <button onClick={() => createTag(newTagInput, newTagColor)} className="tag-create-button btn-primary min-h-[48px] sm:min-h-[40px]">
             {t('createButton')}
           </button>
         </div>
@@ -1028,7 +1029,10 @@ function App() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
                     className="w-12 h-12 rounded-lg flex-shrink-0"
-                    style={{ backgroundColor: tag.color }}
+                    style={{ 
+                      backgroundColor: tag.color,
+                      border: '1px solid ' + getTagBorderColor(tag.color)
+                    }}
                   />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{tag.name}</h3>
@@ -1072,10 +1076,10 @@ function App() {
             return (
               <div 
                 key={achievement.id} 
-                className={`card ${unlocked ? 'border-2 border-primary-500' : 'opacity-60'}`}
+                className={`card achievement-card ${unlocked ? 'border-2 border-primary-500' : 'opacity-60'}`}
               >
                 <div className="flex items-start gap-4 mb-4">
-                  <div className={`p-3 rounded-lg ${unlocked ? 'bg-primary-100' : 'bg-gray-100'} flex-shrink-0`}>
+                  <div className={`p-3 rounded-lg ${unlocked ? 'achievement-icon-unlocked' : 'achievement-icon-locked'} flex-shrink-0`}>
                     <Award size={28} className={unlocked ? 'text-primary-600' : 'text-gray-400'} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1216,10 +1220,10 @@ function App() {
                   <span>{t('updatedAt')} {formatDate(viewingNote.updatedAt, currentLanguage)}</span>
                 )}
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  viewingNote.status === 'saved' ? 'bg-green-100 text-green-700' :
-                  viewingNote.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
-                  viewingNote.status === 'reused' ? 'bg-purple-100 text-purple-700' :
-                  'bg-gray-100 text-gray-700'
+                  viewingNote.status === 'saved' ? 'status-badge-saved' :
+                  viewingNote.status === 'reviewed' ? 'status-badge-reviewed' :
+                  viewingNote.status === 'reused' ? 'status-badge-reused' :
+                  'status-badge-draft'
                 }`}>
                   {getStatusText(viewingNote.status)}
                 </span>
@@ -1231,7 +1235,7 @@ function App() {
                   {noteTags.map(tag => (
                     <span
                       key={tag.id}
-                      className="px-3 py-1 rounded-full text-sm font-medium text-white"
+                      className="px-3 py-1 rounded-full text-sm font-medium"
                       style={{
                         backgroundColor: tag.color,
                         color: getTagTextColor(tag.color)
@@ -1400,7 +1404,8 @@ function App() {
                   className="tag-badge flex items-center gap-1 min-h-[36px] px-3"
                   style={{
                     backgroundColor: tagData?.color || '#3b82f6',
-                    color: getTagTextColor(tagData?.color || '#3b82f6')
+                    color: getTagTextColor(tagData?.color || '#3b82f6'),
+                    border: '1px solid transparent'
                   }}
                 >
                   {tag}
