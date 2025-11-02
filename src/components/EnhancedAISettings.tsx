@@ -3,13 +3,11 @@
  * 集成多提供商配置和动态模型选择
  */
 
-import React, { useState, useEffect } from 'react';
-import { aiSettingsService } from '../services/ai';
+import { useState, useEffect } from 'react';
+import { aiSettingsService } from '../services/ai/index';
 import { DbAIProvider } from '../db';
-import { ModelInfo, CustomProviderConfig } from '../services/ai/types';
+import { CustomProviderConfig } from '../services/ai/types';
 import { ProviderConfig } from './ai/ProviderConfig';
-import { ModelInfoCard } from './ai/ModelInfoCard';
-import { useConfirmDialog } from '../hooks/useDialog';
 
 interface EnhancedAISettingsProps {
   onClose?: () => void;
@@ -26,10 +24,8 @@ export function EnhancedAISettings({ onClose }: EnhancedAISettingsProps) {
     headers: {}
   });
   const [customApiKey, setCustomApiKey] = useState('');
-  const [testResults, setTestResults] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'providers' | 'models' | 'usage'>('providers');
-  const { confirm } = useConfirmDialog();
-
+  
   useEffect(() => {
     loadProviders();
   }, []);
@@ -37,10 +33,18 @@ export function EnhancedAISettings({ onClose }: EnhancedAISettingsProps) {
   const loadProviders = async () => {
     try {
       setIsLoading(true);
+      console.log('正在加载AI提供商...');
+
+      // 确保AI服务已初始化
+      await aiSettingsService.initialize();
+
       const settings = await aiSettingsService.getSettings();
+      console.log('成功加载AI提供商:', settings.providers);
       setProviders(settings.providers);
     } catch (error) {
       console.error('加载AI提供商失败:', error);
+      // 显示错误信息给用户
+      alert('加载AI提供商失败，请刷新页面重试');
     } finally {
       setIsLoading(false);
     }
@@ -53,16 +57,11 @@ export function EnhancedAISettings({ onClose }: EnhancedAISettingsProps) {
   };
 
   const handleTestResult = (result: any) => {
-    setTestResults(prev => [
-      ...prev.filter(r => r.providerId !== result.providerId),
-      result
-    ]);
-
-    // 3秒后清除成功的结果
+    // 显示测试结果通知
     if (result.success) {
-      setTimeout(() => {
-        setTestResults(prev => prev.filter(r => r.providerId !== result.providerId));
-      }, 3000);
+      alert(`连接成功: ${result.message}`);
+    } else {
+      alert(`连接失败: ${result.message}`);
     }
   };
 
@@ -90,12 +89,7 @@ export function EnhancedAISettings({ onClose }: EnhancedAISettingsProps) {
   };
 
   const handleDeleteProvider = async (providerId: number) => {
-    const confirmed = await confirm({
-      title: '确认删除',
-      message: '删除后将无法恢复，是否继续？',
-      confirmText: '删除',
-      cancelText: '取消'
-    });
+    const confirmed = window.confirm('删除后将无法恢复，是否继续？');
 
     if (confirmed) {
       try {
@@ -111,9 +105,11 @@ export function EnhancedAISettings({ onClose }: EnhancedAISettingsProps) {
   const handleTestAllProviders = async () => {
     try {
       const results = await aiSettingsService.testAllEnabledProviders();
-      setTestResults(results);
+      console.log('批量测试结果:', results);
+      alert(`测试完成，共测试 ${results.length} 个提供商`);
     } catch (error) {
       console.error('批量测试失败:', error);
+      alert('批量测试失败');
     }
   };
 
@@ -414,26 +410,24 @@ export function EnhancedAISettings({ onClose }: EnhancedAISettingsProps) {
 
 // 模型比较内容组件
 function ModelComparisonContent() {
-  const [allModels, setAllModels] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    loadAllModels();
-  }, []);
 
   const loadAllModels = async () => {
     setIsLoading(true);
     try {
       const settings = await aiSettingsService.getSettings();
-      const credentials = await aiSettingsService.getProviderCredentials();
       // 这里应该加载所有模型，为了演示暂时使用空数组
-      setAllModels([]);
+      console.log('加载模型设置:', settings);
     } catch (error) {
       console.error('加载模型失败:', error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadAllModels();
+  }, []);
 
   if (isLoading) {
     return (

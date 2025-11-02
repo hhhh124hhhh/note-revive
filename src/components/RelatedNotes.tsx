@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link2, X, RefreshCw } from 'lucide-react';
 import { getNoteRelations } from '../services/ai';
 import { Note } from '../types';
@@ -30,39 +30,63 @@ export default function RelatedNotes({
   // 获取所有便签
   const allNotes = useLiveQuery(() => db.notes.toArray()) || [];
 
-  // 获取相关便签
-  const relatedNotes = relations?.relatedNoteIds
-    .map(id => allNotes.find(note => note.id === id))
-    .filter(note => note && !note.isPrivate) as Note[] || [];
+  // 使用 useMemo 优化相关便签计算
+  const relatedNotes = useMemo(() => {
+    if (!relations?.relatedNoteIds || !allNotes.length) return [];
+
+    return relations.relatedNoteIds
+      .map(id => allNotes.find(note => note.id === id))
+      .filter(note => note && !note.isPrivate) as Note[];
+  }, [relations, allNotes]);
+
+  // 使用 useMemo 优化渲染条件判断
+  const shouldRender = useMemo(() => {
+    return isVisible &&
+           !dismissed &&
+           currentNote &&
+           !currentNote.isPrivate &&
+           (loading || (relations && relatedNotes.length > 0));
+  }, [isVisible, dismissed, currentNote, loading, relations, relatedNotes]);
 
   // 当当前便签变化时，获取关联建议
   useEffect(() => {
     if (!isVisible || !currentNote || dismissed || currentNote.isPrivate) {
       setRelations(null);
+      setLoading(false);
+      return;
+    }
+
+    // 如果便签内容太短，不进行关联分析
+    if (currentNote.content.length < 20) {
+      setRelations(null);
+      setLoading(false);
       return;
     }
 
     const fetchRelations = async () => {
       setLoading(true);
       try {
-        if (currentNote?.id) {
+        if (currentNote?.id && allNotes.length > 1) {
+          console.log(`正在获取便签 ${currentNote.id} 的关联建议...`);
           const noteRelations = await getNoteRelations(currentNote.id, allNotes);
+          console.log(`获取到关联建议:`, noteRelations);
           setRelations(noteRelations);
         }
       } catch (error) {
         console.warn('获取便签关联失败:', error);
+        setRelations(null);
       } finally {
         setLoading(false);
       }
     };
 
     // 延迟获取，避免频繁调用
-    const debounceTimer = setTimeout(fetchRelations, 300);
+    const debounceTimer = setTimeout(fetchRelations, 500);
     return () => clearTimeout(debounceTimer);
-  }, [currentNote?.id, allNotes, isVisible, dismissed]);
+  }, [currentNote?.id, currentNote?.content, allNotes.length, isVisible, dismissed]);
 
-  // 如果不需要显示或没有相关便签，则不渲染
-  if (!isVisible || dismissed || currentNote?.isPrivate || (!loading && (!relations || relatedNotes.length === 0))) {
+  // 如果不需要显示，则不渲染
+  if (!shouldRender) {
     return null;
   }
 

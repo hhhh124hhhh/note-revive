@@ -3,7 +3,7 @@
  */
 
 // 类型定义
-export * from './types';
+export type * from './types';
 
 // 核心组件
 export { ModelCacheManager } from './ModelCacheManager';
@@ -15,7 +15,7 @@ export { DeepSeekProvider } from './providers/DeepSeekProvider';
 export { ZhipuProvider } from './providers/ZhipuProvider';
 export { KimiProvider } from './providers/KimiProvider';
 export { CustomProvider } from './providers/CustomProvider';
-export { ModelProviderWithTest } from './providers/types';
+export type { ModelProviderWithTest } from './providers/types';
 
 // AI设置服务
 export { AISettingsService, aiSettingsService } from './AISettingsService';

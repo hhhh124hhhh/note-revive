@@ -2,8 +2,6 @@
  * 模型详细信息卡片组件
  * 显示AI模型的详细信息和能力
  */
-
-import React from 'react';
 import { ModelInfo } from '../../services/ai/types';
 
 interface ModelInfoCardProps {

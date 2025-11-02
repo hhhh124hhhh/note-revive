@@ -50,7 +50,7 @@ import AISearchSuggestions from './components/AISearchSuggestions';
 import RelatedNotes from './components/RelatedNotes';
 import { getTagTextColor, getTagBorderColor } from './utils/colorContrast';
 import { t } from './utils/i18n';
-import { aiSettingsService } from './services/ai';
+import { aiSettingsService } from './services/ai/index';
 
   const formatDate = (date: Date, language: 'zh' | 'en' = 'zh'): string => {
   const locale = language === 'zh' ? 'zh-CN' : 'en-US';
@@ -188,6 +188,23 @@ function App() {
   // 加载数据
   const notes = useLiveQuery(() => db.notes.orderBy('updatedAt').reverse().toArray());
   const tags = useLiveQuery(() => db.tags.orderBy('createdAt').toArray());
+
+  // 计算标签计数 - 优化性能
+  const tagCounts = useMemo(() => {
+    if (!tags || !notes) return {};
+
+    const counts: Record<string, number> = {};
+    notes.forEach(note => {
+      if (note.tags && Array.isArray(note.tags)) {
+        note.tags.forEach(tagName => {
+          counts[tagName] = (counts[tagName] || 0) + 1;
+        });
+      }
+    });
+
+    console.log('计算标签计数:', counts);
+    return counts;
+  }, [tags, notes]);
   const allTagsForView = useLiveQuery(() => db.tags.toArray());
   // 优化等级查询：使用 toArray() 代替 get() 以更好地监听变化，并添加刷新触发器
   const userPointsList = useLiveQuery(
@@ -280,6 +297,12 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // 初始化轻量级 AI 服务
+        const { aiService } = await import('../services/ai');
+        await aiService.init();
+        // 设置全局 AI 服务
+        window.aiService = aiService;
+
         await Promise.all([
           initUserPoints(),
           initDefaultSettings(),
@@ -527,6 +550,201 @@ function App() {
         await db.tags.delete(id);
       }
     );
+  };
+
+  // 查看特定标签的关联便签
+  const viewRelatedNotesForTag = async (tagName: string) => {
+    if (!notes || notes.length === 0) {
+      alert('没有可用的便签数据');
+      return;
+    }
+
+    // 获取所有包含该标签的便签
+    const tagNotes = notes.filter(note =>
+      note.tags && Array.isArray(note.tags) && note.tags.includes(tagName)
+    );
+
+    if (tagNotes.length === 0) {
+      alert(`没有找到包含标签 "${tagName}" 的便签`);
+      return;
+    }
+
+    try {
+      // 显示加载状态
+      alert(`正在分析标签 "${tagName}" 的关联便签...`);
+
+      // 检查AI服务是否可用
+      const aiService = window.aiService;
+      if (!aiService) {
+        // 如果AI服务不可用，使用简单的关键词匹配
+        showSimpleRelatedNotes(tagName, tagNotes);
+        return;
+      }
+
+      // 获取所有便签的标题和内容用于AI分析
+      const allNotesText = notes.map(note => ({
+        id: note.id!,
+        title: note.title,
+        content: note.content.length > 200 ? note.content.substring(0, 200) + '...' : note.content,
+        tags: note.tags || []
+      }));
+
+      // 获取标签便签的详细信息
+      const tagNotesText = tagNotes.map(note => ({
+        id: note.id!,
+        title: note.title,
+        content: note.content.length > 300 ? note.content.substring(0, 300) + '...' : note.content,
+        tags: note.tags || []
+      }));
+
+      // 使用AI分析便签关联性
+      await findRelatedNotesForTagWithAI(tagName, tagNotesText, allNotesText);
+
+    } catch (error) {
+      console.error('分析标签关联便签失败:', error);
+      // 降级到简单匹配
+      showSimpleRelatedNotes(tagName, tagNotes);
+    }
+  };
+
+  // 使用AI分析标签关联便签
+  const findRelatedNotesForTagWithAI = async (
+    tagName: string,
+    tagNotes: Array<{id: number, title: string, content: string, tags: string[]}>,
+    allNotes: Array<{id: number, title: string, content: string, tags: string[]}>
+  ) => {
+    try {
+      // 调用AI服务分析便签关联性
+      const relatedNotes = await window.aiService.analyzeTagRelatedNotes(tagName, tagNotes, allNotes);
+
+      if (relatedNotes && relatedNotes.length > 0) {
+        // 显示AI分析结果
+        showRelatedNotesResult(tagName, relatedNotes, 'AI分析');
+      } else {
+        // 如果AI没有找到关联，使用简单匹配
+        showSimpleRelatedNotes(tagName, tagNotes);
+      }
+    } catch (error) {
+      console.error('AI分析失败:', error);
+      // 降级到简单匹配
+      showSimpleRelatedNotes(tagName, tagNotes);
+    }
+  };
+
+  // 简单的关联便签匹配（降级方案）
+  const showSimpleRelatedNotes = (tagName: string, tagNotes: any[]) => {
+    if (!notes || notes.length === 0) return;
+
+    // 获取所有其他便签
+    const otherNotes = notes.filter(note =>
+      !tagNotes.some(tagNote => tagNote.id === note.id) &&
+      note.tags &&
+      Array.isArray(note.tags) &&
+      note.tags.some(tag => tag !== tagName)
+    );
+
+    // 简单的关键词和标签匹配
+    const relatedNotes = otherNotes.map(note => {
+      let score = 0;
+      const reasons = [];
+
+      // 检查共同的标签
+      const commonTags = note.tags?.filter(tag =>
+        tagNotes.some(tagNote => tagNote.tags?.includes(tag))
+      ) || [];
+
+      if (commonTags.length > 0) {
+        score += commonTags.length * 10;
+        reasons.push(`共同标签: ${commonTags.join(', ')}`);
+      }
+
+      // 检查标题关键词匹配
+      const titleWords = note.title.toLowerCase().split(/\s+/);
+      const tagNoteWords = tagNotes.flatMap(tn => tn.title.toLowerCase().split(/\s+/));
+      const commonWords = titleWords.filter(word =>
+        word.length > 2 && tagNoteWords.includes(word)
+      );
+
+      if (commonWords.length > 0) {
+        score += commonWords.length * 5;
+        reasons.push(`标题关键词: ${commonWords.slice(0, 3).join(', ')}`);
+      }
+
+      return {
+        note,
+        score,
+        reasons: reasons.length > 0 ? reasons : ['基础关联'],
+        confidence: Math.min(score / 50, 1) // 简单的置信度计算
+      };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6); // 最多显示6个关联便签
+
+    if (relatedNotes.length > 0) {
+      showRelatedNotesResult(tagName, relatedNotes, '关键词匹配');
+    } else {
+      alert(`没有找到与标签 "${tagName}" 关联的其他便签`);
+    }
+  };
+
+  // 显示关联便签结果
+  const showRelatedNotesResult = (tagName: string, relatedNotes: any[], method: string) => {
+    const resultHtml = `
+      <div style="max-width: 600px; max-height: 500px; overflow-y: auto;">
+        <h3>标签 "${tagName}" 的关联便签 (${method})</h3>
+        <div style="margin-top: 16px;">
+          ${relatedNotes.map((item, index) => `
+            <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 14px; font-weight: 600;">${item.note.title}</h4>
+                <span style="font-size: 12px; color: #6b7280;">置信度: ${Math.round((item.confidence || 0) * 100)}%</span>
+              </div>
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
+                ${item.note.content.length > 150 ? item.note.content.substring(0, 150) + '...' : item.note.content}
+              </p>
+              <div style="font-size: 11px; color: #059669;">
+                关联原因: ${Array.isArray(item.reasons) ? item.reasons.join(', ') : item.reasons}
+              </div>
+              <div style="margin-top: 8px;">
+                ${item.note.tags && item.note.tags.length > 0 ?
+                  item.note.tags.map(tag =>
+                    `<span style="display: inline-block; margin: 2px 4px 2px 0; padding: 2px 6px; background: #f3f4f6; border-radius: 4px; font-size: 10px;">${tag}</span>`
+                  ).join('')
+                  : '无标签'
+                }
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="margin-top: 16px; text-align: center;">
+          <button onclick="this.closest('.custom-dialog').remove()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            关闭
+          </button>
+        </div>
+      </div>
+    `;
+
+    // 创建自定义弹窗显示结果
+    const dialog = document.createElement('div');
+    dialog.className = 'custom-dialog';
+    dialog.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: white; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      z-index: 1000; padding: 24px;
+    `;
+    dialog.innerHTML = resultHtml;
+
+    // 添加背景遮罩
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.5); z-index: 999;
+    `;
+    backdrop.onclick = () => dialog.remove();
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(dialog);
   };
 
   const addTagToNote = (tagName: string) => {
@@ -1034,7 +1252,7 @@ function App() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {tags?.map(tag => {
-          const noteCount = notes?.filter(note => note.tags.includes(tag.name)).length || 0;
+          const noteCount = tagCounts[tag.name] || 0;
           
           return (
             <div key={tag.id} className="card group">
@@ -1042,7 +1260,7 @@ function App() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
                     className="w-12 h-12 rounded-lg flex-shrink-0"
-                    style={{ 
+                    style={{
                       backgroundColor: tag.color,
                       border: '1px solid ' + getTagBorderColor(tag.color)
                     }}
@@ -1052,12 +1270,23 @@ function App() {
                     <p className="text-sm text-gray-500">{t('noteCountWithUnit', { count: noteCount })}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => deleteTag(tag.id!)}
-                  className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-2 hover:bg-red-50 rounded-lg flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                >
-                  <Trash2 size={16} className="text-red-600" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {noteCount > 0 && (
+                    <button
+                      onClick={() => viewRelatedNotesForTag(tag.name)}
+                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-2 hover:bg-blue-50 rounded-lg flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      title="查看相关便签"
+                    >
+                      <Search size={16} className="text-blue-600" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteTag(tag.id!)}
+                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-2 hover:bg-red-50 rounded-lg flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  >
+                    <Trash2 size={16} className="text-red-600" />
+                  </button>
+                </div>
               </div>
             </div>
           );

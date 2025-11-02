@@ -2,7 +2,10 @@
  * AI服务提供商类型定义
  */
 
-import { ModelInfo, CustomProviderConfig, APIResponse, TestResult } from '../types';
+import { ModelInfo, CustomProviderConfig, TestResult } from '../types';
+
+// 重新导出类型以便其他文件使用
+export type { ModelInfo, CustomProviderConfig, TestResult } from '../types';
 
 // 服务商接口
 export interface ModelProvider {

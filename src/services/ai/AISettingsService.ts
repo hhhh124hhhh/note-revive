@@ -15,13 +15,11 @@ import {
   DbAIProvider,
   initDefaultAIProviders,
   migrateAISettings,
-  recordModelUsage,
-  getCachedModelData,
-  cacheModelData
-} from '../db';
-import { ModelInfo, TestResult, CustomProviderConfig } from './types';
-import { encryptContent, decryptContent } from '../db';
-import { envConfigService, type AIProviderConfig, type GlobalAIConfig } from '../config/EnvConfigService';
+  recordModelUsage
+} from '../../db';
+import { ModelInfo, CustomProviderConfig } from './types';
+import { encryptContent, decryptContent } from '../../db';
+import { envConfigService } from '../config/EnvConfigService';
 
 export interface AISettings {
   providers: DbAIProvider[];
@@ -51,19 +49,32 @@ export class AISettingsService {
    */
   async initialize(): Promise<void> {
     try {
+      console.log('开始初始化AI设置服务...');
+
       // 初始化默认提供商
+      console.log('初始化默认AI提供商...');
       await initDefaultAIProviders();
 
+      // 验证提供商是否正确创建
+      const providers = await getAIProviders();
+      console.log(`已加载 ${providers.length} 个AI提供商:`, providers.map(p => p.name));
+
       // 从环境变量加载初始配置
+      console.log('从环境变量加载配置...');
       await this.loadFromEnvironment();
 
       // 迁移旧版本设置
+      console.log('迁移旧版本设置...');
       await migrateAISettings();
 
       // 初始化模型管理器
+      console.log('初始化模型管理器...');
       await this.initializeModelManager();
+
+      console.log('AI设置服务初始化完成');
     } catch (error) {
       console.error('AI设置服务初始化失败:', error);
+      throw error; // 重新抛出错误以便上层处理
     }
   }
 
@@ -480,7 +491,7 @@ export class AISettingsService {
             // 创建新的提供商记录
             await addAIProvider({
               name: envProvider.name,
-              type: envProvider.type,
+              type: envProvider.type === 'openai' || envProvider.type === 'claude' ? 'custom' : envProvider.type,
               enabled: envProvider.enabled,
               apiKey: encryptContent(envProvider.apiKey),
               selectedModel: envProvider.defaultModel,

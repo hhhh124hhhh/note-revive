@@ -3,11 +3,11 @@
  * 用于配置和测试AI服务提供商
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { DbAIProvider } from '../../db';
 import { ModelInfo, CustomProviderConfig } from '../../services/ai/types';
-import { aiSettingsService } from '../../services/ai';
-import { ModelInfoCard, ModelComparison } from './ModelInfoCard';
+import { aiSettingsService } from '../../services/ai/index';
+import { ModelInfoCard } from './ModelInfoCard';
 
 interface ProviderConfigProps {
   provider: DbAIProvider;
@@ -100,7 +100,9 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
   };
 
   const handleLoadModels = async () => {
-    if (!provider.apiKey && apiKey === '••••••••••••••••') {
+    // 检查是否有有效的API密钥（已保存的或新输入的）
+    const hasValidApiKey = provider.apiKey || (apiKey && apiKey !== '••••••••••••••••');
+    if (!hasValidApiKey) {
       alert('请先配置API密钥');
       return;
     }
@@ -168,12 +170,6 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-          >
-            {isEditing ? '取消' : '编辑'}
-          </button>
-          <button
             onClick={handleTest}
             disabled={isTesting}
             className="px-3 py-1 text-sm bg-primary-100 text-primary-700 rounded hover:bg-primary-200 disabled:opacity-50"
@@ -217,6 +213,40 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
           </div>
         </div>
       </div>
+
+      {/* 配置状态指示器 */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+        <div className="flex items-center gap-2">
+          <div className="text-sm">
+            <span className="font-medium text-blue-900">配置状态：</span>
+            {!provider.apiKey && !isEditing ? (
+              <span className="text-blue-700">未配置 - 点击"编辑"按钮开始配置</span>
+            ) : isEditing ? (
+              <span className="text-blue-700">配置中 - 请输入API密钥并保存</span>
+            ) : provider.apiKey && !provider.selectedModel ? (
+              <span className="text-blue-700">已配置密钥 - 请加载模型列表并选择模型</span>
+            ) : provider.selectedModel ? (
+              <span className="text-green-700">配置完成 - 已选择模型</span>
+            ) : (
+              <span className="text-blue-700">部分配置 - 请完善配置</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 内置供应商配置提示 */}
+      {provider.type !== 'custom' && !provider.apiKey && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+          <div className="text-sm">
+            <span className="font-medium text-yellow-900">配置提示：</span>
+            <span className="text-yellow-700">
+              {provider.type === 'deepseek' && '请访问 DeepSeek 平台 (platform.deepseek.com) 获取API密钥'}
+              {provider.type === 'zhipu' && '请访问智谱AI平台 (open.bigmodel.cn) 获取API密钥'}
+              {provider.type === 'kimi' && '请访问 Moonshot 平台 (platform.moonshot.cn) 获取API密钥'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* API密钥配置 */}
       <div className="mb-4">
@@ -263,7 +293,7 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
                 value={customConfig?.apiType || 'openai'}
                 onChange={(e) => setCustomConfig(prev => prev ? {...prev, apiType: e.target.value as 'openai' | 'claude'} : {
                   name: provider.name,
-                  baseUrl: prev?.baseUrl || '',
+                  baseUrl: '',
                   apiType: e.target.value as 'openai' | 'claude',
                   headers: {}
                 })}
@@ -292,31 +322,48 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
       )}
 
       {/* 操作按钮 */}
-      {isEditing && (
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={handleLoadModels}
-            disabled={isLoadingModels}
-            className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
-          >
-            {isLoadingModels ? '加载中...' : '加载模型列表'}
-          </button>
-          <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-4">
+        {/* 左侧按钮 */}
+        <div className="flex items-center gap-2">
+          {/* 加载模型列表按钮 - 有API密钥时显示 */}
+          {(provider.apiKey || (apiKey && apiKey !== '••••••••••••••••')) && (
             <button
-              onClick={() => setIsEditing(false)}
-              className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              onClick={handleLoadModels}
+              disabled={isLoadingModels}
+              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
             >
-              取消
+              {isLoadingModels ? '加载中...' : '加载模型列表'}
             </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
-            >
-              保存配置
-            </button>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* 右侧按钮 */}
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+              >
+                保存配置
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="px-4 py-2 text-sm bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
+            >
+              编辑配置
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* 模型列表 */}
       {showModels && (

@@ -124,3 +124,26 @@ export interface EditingNote {
   isPrivate: boolean;
   status: 'draft' | 'saved' | 'reviewed' | 'reused';
 }
+
+// AI 服务相关接口
+export interface RelatedNoteAnalysis {
+  note: Note;
+  score: number;
+  reasons: string[];
+  confidence: number;
+}
+
+export interface AIService {
+  analyzeTagRelatedNotes(
+    tagName: string,
+    tagNotes: Array<{id: number, title: string, content: string, tags: string[]}>,
+    allNotes: Array<{id: number, title: string, content: string, tags: string[]}>
+  ): Promise<RelatedNoteAnalysis[]>;
+}
+
+// 扩展 Window 接口以包含 AI 服务
+declare global {
+  interface Window {
+    aiService?: AIService;
+  }
+}

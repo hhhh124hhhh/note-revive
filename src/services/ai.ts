@@ -183,44 +183,122 @@ export class LightweightAIService {
     const targetNote = allNotes.find(note => note.id === noteId);
     if (!targetNote || targetNote.isPrivate) return null;
 
-    const relatedNoteIds: string[] = [];
+    const noteScores: Array<{ id: string; score: number; relationType: 'content' | 'tags' | 'semantic' }> = [];
 
     allNotes.forEach(note => {
       if (note.id === noteId || note.isPrivate) return;
 
-      let confidence = 0;
+      let contentScore = 0;
+      let tagScore = 0;
+      let semanticScore = 0;
 
-      // 内容相似性
-      const targetWords = new Set(targetNote.content.toLowerCase().split(/\s+/));
-      const noteWords = new Set(note.content.toLowerCase().split(/\s+/));
-      const intersection = new Set([...targetWords].filter(word => noteWords.has(word)));
+      // 1. 内容相似性分析
+      const targetContent = targetNote.content.toLowerCase();
+      const noteContent = note.content.toLowerCase();
 
-      if (intersection.size > 3) {
-        confidence += intersection.size / Math.max(targetWords.size, noteWords.size);
+      // 提取有意义的词汇（长度大于2的词）
+      const targetWords = new Set(targetContent.split(/\s+/).filter(word => word.length > 2));
+      const noteWords = new Set(noteContent.split(/\s+/).filter(word => word.length > 2));
+
+      // 计算词汇重叠度
+      const commonWords = [...targetWords].filter(word => noteWords.has(word));
+      if (commonWords.length > 0) {
+        const jaccardSimilarity = commonWords.length / (targetWords.size + noteWords.size - commonWords.length);
+        contentScore = jaccardSimilarity * 0.8; // 内容权重0.8
       }
 
-      // 标签重叠
-      const commonTags = targetNote.tags.filter((tag: string) =>
-        note.tags.includes(tag)
-      );
-      if (commonTags.length > 0) {
-        confidence += commonTags.length * 0.3;
+      // 2. 标签关联分析
+      if (targetNote.tags && note.tags) {
+        const commonTags = targetNote.tags.filter((tag: string) => note.tags.includes(tag));
+        if (commonTags.length > 0) {
+          tagScore = Math.min(commonTags.length * 0.4, 1.0); // 标签权重，但不超过1.0
+        }
       }
 
-      // 如果置信度足够高，添加为相关便签
-      if (confidence > 0.3) {
-        relatedNoteIds.push(note.id);
+      // 3. 语义关联分析（基于关键词模式匹配）
+      semanticScore = this.calculateSemanticSimilarity(targetContent, noteContent);
+
+      // 综合评分
+      const finalScore = Math.max(contentScore, tagScore, semanticScore);
+
+      if (finalScore > 0.25) { // 降低阈值，增加关联性
+        let relationType: 'content' | 'tags' | 'semantic' = 'semantic';
+
+        if (tagScore > contentScore && tagScore > semanticScore) {
+          relationType = 'tags';
+        } else if (contentScore > semanticScore) {
+          relationType = 'content';
+        }
+
+        noteScores.push({
+          id: note.id,
+          score: finalScore,
+          relationType
+        });
       }
     });
 
-    if (relatedNoteIds.length === 0) return null;
+    if (noteScores.length === 0) return null;
+
+    // 按评分排序，选择最相关的便签
+    noteScores.sort((a, b) => b.score - a.score);
+    const topNotes = noteScores.slice(0, 4); // 增加到4个相关便签
+
+    // 计算整体置信度
+    const avgConfidence = topNotes.reduce((sum, note) => sum + note.score, 0) / topNotes.length;
 
     return {
       noteId,
-      relatedNoteIds: relatedNoteIds.slice(0, 3), // 最多3个相关便签
-      relationType: 'semantic',
-      confidence: Math.min(relatedNoteIds.length * 0.4, 0.9)
+      relatedNoteIds: topNotes.map(note => note.id),
+      relationType: topNotes[0].relationType, // 使用最高分便签的关联类型
+      confidence: Math.min(avgConfidence * 1.2, 0.95) // 稍微提升置信度
     };
+  }
+
+  /**
+   * 计算语义相似度（基于关键词模式）
+   */
+  private calculateSemanticSimilarity(content1: string, content2: string): number {
+    let similarity = 0;
+
+    // 时间关联性
+    const timeKeywords = ['今天', '明天', '昨天', '上周', '下周', '本月', '去年', '计划', '提醒', '会议'];
+    const timeMatches1 = timeKeywords.filter(keyword => content1.includes(keyword));
+    const timeMatches2 = timeKeywords.filter(keyword => content2.includes(keyword));
+    if (timeMatches1.length > 0 && timeMatches2.length > 0) {
+      similarity += 0.3;
+    }
+
+    // 主题关联性（常见主题词）
+    const topicKeywords = [
+      '项目', '工作', '学习', '生活', '健康', '财务', '旅行', '家庭',
+      '朋友', '购物', '电影', '音乐', '书籍', '运动', '美食'
+    ];
+    const topicMatches1 = topicKeywords.filter(keyword => content1.includes(keyword));
+    const topicMatches2 = topicKeywords.filter(keyword => content2.includes(keyword));
+    const commonTopics = topicMatches1.filter(topic => topicMatches2.includes(topic));
+    if (commonTopics.length > 0) {
+      similarity += commonTopics.length * 0.2;
+    }
+
+    // 情感关联性
+    const emotionKeywords = ['开心', '难过', '生气', '激动', '焦虑', '满足', '失望', '期待'];
+    const emotionMatches1 = emotionKeywords.filter(keyword => content1.includes(keyword));
+    const emotionMatches2 = emotionKeywords.filter(keyword => content2.includes(keyword));
+    if (emotionMatches1.length > 0 && emotionMatches2.length > 0) {
+      similarity += 0.25;
+    }
+
+    // 行为关联性
+    const actionKeywords = ['购买', '完成', '开始', '联系', '预约', '预订', '发送', '接收'];
+    const actionMatches1 = actionKeywords.filter(keyword => content1.includes(keyword));
+    const actionMatches2 = actionKeywords.filter(keyword => content2.includes(keyword));
+    const commonActions = actionMatches1.filter(action => actionMatches2.includes(action));
+    if (commonActions.length > 0) {
+      similarity += commonActions.length * 0.15;
+    }
+
+    return Math.min(similarity, 0.7); // 语义相似度最高0.7
   }
 
   /**

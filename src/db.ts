@@ -23,6 +23,7 @@ export interface DbSettings {
   aiEnabled: boolean;
   aiProvider?: 'openai' | 'claude' | 'mock';
   aiApiKey?: string;
+  aiModel?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -495,32 +496,49 @@ export async function batchSaveAISuggestions(suggestions: Omit<DbAISuggestion, '
 
 // 初始化默认AI提供商
 export async function initDefaultAIProviders(): Promise<void> {
-  const existingProviders = await db.aiProviders.count();
-  if (existingProviders === 0) {
-    const defaultProviders: Omit<DbAIProvider, 'id'>[] = [
-      {
-        name: 'DeepSeek',
-        type: 'deepseek',
-        enabled: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        name: '智谱AI',
-        type: 'zhipu',
-        enabled: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        name: 'Kimi',
-        type: 'kimi',
-        enabled: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
+  const defaultProviders: Omit<DbAIProvider, 'id'>[] = [
+    {
+      name: 'DeepSeek',
+      type: 'deepseek',
+      enabled: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      name: '智谱AI',
+      type: 'zhipu',
+      enabled: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      name: 'Kimi',
+      type: 'kimi',
+      enabled: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ];
+
+  for (const defaultProvider of defaultProviders) {
+    const existingProvider = await db.aiProviders.where('type').equals(defaultProvider.type).first();
+
+    if (!existingProvider) {
+      // 如果提供商不存在，创建新的
+      await db.aiProviders.add(defaultProvider);
+      console.log(`创建了默认AI提供商: ${defaultProvider.name}`);
+    } else {
+      // 如果提供商存在但缺少必要字段，更新它
+      const needsUpdate = !existingProvider.name || !existingProvider.createdAt;
+      if (needsUpdate) {
+        await db.aiProviders.update(existingProvider.id!, {
+          name: defaultProvider.name,
+          createdAt: existingProvider.createdAt || defaultProvider.createdAt,
+          updatedAt: new Date()
+        });
+        console.log(`更新了AI提供商: ${defaultProvider.name}`);
       }
-    ];
-    await db.aiProviders.bulkAdd(defaultProviders);
+    }
   }
 }
 
@@ -531,7 +549,7 @@ export async function getAIProviders(): Promise<DbAIProvider[]> {
 
 // 获取启用的AI提供商
 export async function getEnabledAIProviders(): Promise<DbAIProvider[]> {
-  return await db.aiProviders.where('enabled').equals(true).toArray();
+  return await db.aiProviders.where('enabled').equals(1).toArray();
 }
 
 // 根据类型获取AI提供商
@@ -749,7 +767,7 @@ export async function migrateAISettings(): Promise<void> {
   if (settings.aiEnabled && settings.aiProvider && settings.aiApiKey) {
     // 查找对应的提供商
     let providerType: 'deepseek' | 'zhipu' | 'kimi' | 'custom' = 'custom';
-    let providerName = settings.aiProvider;
+    let providerName: string = settings.aiProvider || '';
 
     if (settings.aiProvider === 'openai') {
       providerType = 'custom';

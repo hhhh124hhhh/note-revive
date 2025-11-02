@@ -3,9 +3,8 @@
  * 集成多模型提供商和动态模型拉取功能
  */
 
-import { aiSettingsService } from './ai';
+import { aiSettingsService } from './ai/index';
 import { ModelInfo, ModelUseCase } from './ai/types';
-import { getEnabledAIProviders } from '../db';
 
 // 搜索建议接口
 export interface SearchSuggestion {

@@ -3,7 +3,7 @@
  * 支持模型列表获取和API密钥验证
  */
 
-import { ModelProviderWithTest, ModelInfo, CustomProviderConfig, TestResult } from './types';
+import { ModelProviderWithTest, ModelInfo, TestResult } from './types';
 import { ModelCacheManager } from '../ModelCacheManager';
 
 export class ZhipuProvider implements ModelProviderWithTest {
