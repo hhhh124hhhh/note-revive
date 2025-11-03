@@ -23,13 +23,23 @@ import { useSettings } from '../hooks/useSettings';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { t } from '../utils/i18n';
 import { EnhancedAISettings } from './EnhancedAISettings';
+import { SimpleAIWrapper } from './AIWrapperSimple';
 
 interface SettingsProps {
   onClose?: () => void;
   onThemeChange?: (theme: Theme) => void;
 }
 
+// AI 功能环境变量检测函数
+const isAIEnabled = (): boolean => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_AI_ENABLED !== 'false';
+  }
+  return true; // 默认启用，用于向后兼容
+};
+
 const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
+  const [isAIAvailable, setIsAIAvailable] = useState<boolean | null>(null);
   const [shortcuts, setShortcuts] = useState<DbCustomShortcut[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'general' | 'shortcuts' | 'data' | 'ai'>('general');
@@ -51,6 +61,17 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
 
   // 现代弹窗系统
   const { showConfirm, showError, showSuccess } = useDialog();
+
+  // 检查 AI 功能可用性
+  useEffect(() => {
+    const checkAIAvailability = () => {
+      const enabled = isAIEnabled();
+      setIsAIAvailable(enabled);
+      console.log(`AI 功能可用性: ${enabled ? '启用' : '禁用'}`);
+    };
+
+    checkAIAvailability();
+  }, []);
 
   // 加载快捷键数据
   useEffect(() => {
@@ -215,7 +236,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
             { id: 'general', label: t('basicSettings'), icon: <SettingsIcon size={16} /> },
             { id: 'shortcuts', label: t('shortcuts'), icon: <Zap size={16} /> },
             { id: 'data', label: t('dataManagement'), icon: <Database size={16} /> },
-            { id: 'ai', label: t('aiSettings'), icon: <Monitor size={16} /> }
+            ...(isAIAvailable ? [{ id: 'ai', label: t('aiSettings'), icon: <Monitor size={16} /> }] : [])
           ].map(tab => (
             <button
               key={tab.id}
@@ -508,9 +529,28 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
         )}
 
         {activeTab === 'ai' && (
-          <div>
+          <SimpleAIWrapper
+            fallback={
+              <div className="text-center py-12">
+                <Monitor size={48} className="mx-auto text-gray-300 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">AI 功能已禁用</h3>
+                <p className="text-gray-500 mb-4">
+                  当前环境中 AI 功能已被禁用。要启用 AI 功能，请设置环境变量 VITE_AI_ENABLED=true 并重启应用。
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                  <h4 className="text-sm font-medium text-blue-800 mb-2">启用 AI 功能</h4>
+                  <code className="text-xs bg-blue-100 px-2 py-1 rounded">
+                    VITE_AI_ENABLED=true
+                  </code>
+                  <p className="text-xs text-blue-600 mt-2">
+                    设置后请重启开发服务器
+                  </p>
+                </div>
+              </div>
+            }
+          >
             <EnhancedAISettings onClose={onClose} />
-          </div>
+          </SimpleAIWrapper>
         )}
       </div>
 

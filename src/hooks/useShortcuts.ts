@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { DbCustomShortcut, ShortcutsState, ShortcutItem } from '../types';
 import { getShortcuts, getComboString } from '../db';
 import { DEFAULT_SHORTCUTS, SHORTCUT_ACTIONS } from '../constants/shortcuts';
+import { addKeyListener } from '../utils/event-listener-manager';
 
 interface UseShortcutsOptions {
   onAction?: (action: string) => void;
@@ -112,8 +113,15 @@ export const useShortcuts = (options: UseShortcutsOptions = {}) => {
       });
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    // 使用事件监听器管理器
+    const eventHandler = (e: Event) => {
+      handleKeyDown(e as KeyboardEvent);
+    };
+    
+    addKeyListener(document, eventHandler);
+    return () => {
+      document.removeEventListener('keydown', eventHandler);
+    };
   }, [shortcuts, executeAction]);
 
   // 打开快捷面板

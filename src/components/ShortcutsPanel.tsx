@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Search, FileText, Settings, Palette, Download, Tag, Hash } from 'lucide-react';
 import { ShortcutItem } from '../types';
 import { t } from '../utils/i18n';
+import { addKeyListener } from '../utils/event-listener-manager';
 
 interface ShortcutsPanelProps {
   isOpen: boolean;
@@ -49,15 +50,45 @@ const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({
   // ESC键关闭面板
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
-        event.preventDefault();
-        onClose();
+      if (!isOpen) return;
+
+      switch (event.key) {
+        case 'Escape':
+          event.preventDefault();
+          onClose();
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          // 通过onSelectItem来处理索引变化
+          if (filteredItems.length > 0) {
+            const nextIndex = selectedIndex < filteredItems.length - 1 ? selectedIndex + 1 : 0;
+            // 这里需要通过父组件来更新selectedIndex
+          }
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          // 通过onSelectItem来处理索引变化
+          if (filteredItems.length > 0) {
+            const prevIndex = selectedIndex > 0 ? selectedIndex - 1 : filteredItems.length - 1;
+            // 这里需要通过父组件来更新selectedIndex
+          }
+          break;
+        case 'Enter':
+          event.preventDefault();
+          if (filteredItems[selectedIndex]) {
+            onSelectItem(selectedIndex);
+          }
+          break;
       }
     };
 
-    document.addEventListener('keydown', handleGlobalKeyDown);
-    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isOpen, onClose]);
+    const eventHandler = (e: Event) => {
+      handleGlobalKeyDown(e as KeyboardEvent);
+    };
+
+    addKeyListener(document, eventHandler);
+    return () => document.removeEventListener('keydown', eventHandler);
+  }, [isOpen, onClose, filteredItems, selectedIndex, onSelectItem]);
 
   if (!isOpen) return null;
 

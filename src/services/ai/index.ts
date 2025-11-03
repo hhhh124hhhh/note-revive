@@ -21,34 +21,13 @@ export type { ModelProviderWithTest } from './providers/types';
 export { AISettingsService, aiSettingsService } from './AISettingsService';
 export type { AISettings, ProviderTestResult } from './AISettingsService';
 
-// 便捷工厂函数
-export function createModelManager(config?: ModelManagerConfig): ModelManager {
-  return new ModelManager(config);
-}
-
-export function createRecommendationEngine(): ModelRecommendationEngine {
-  return new ModelRecommendationEngine();
-}
-
-export function createCacheManager(): ModelCacheManager {
-  return new ModelCacheManager();
-}
-
-export function createAISettingsService(): AISettingsService {
-  return new AISettingsService();
-}
-
-// 默认配置
-export const DEFAULT_MODEL_MANAGER_CONFIG: ModelManagerConfig = {
-  deepSeekEnabled: true,
-  zhipuEnabled: true,
-  kimiEnabled: true,
-  customProviders: []
-};
-
-export const DEFAULT_RECOMMENDATION_CRITERIA: RecommendationCriteria = {
-  useCase: 'general',
-  prioritySpeed: true,
-  priorityQuality: false,
-  maxCostPerRequest: 0.01
-};
+// AI功能管理器
+export {
+  aiFeatureManager,
+  isAIAvailable,
+  getAIStatus,
+  initializeAI,
+  safeGetAIService,
+  safeExecuteAI
+} from './AIFeatureManager';
+export type { AIFeatureStatus, AIConfiguration } from './AIFeatureManager';

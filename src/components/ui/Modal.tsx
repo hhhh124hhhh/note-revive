@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
+import { addKeyListener } from '../../utils/event-listener-manager';
 import { X } from 'lucide-react';
 import { t } from '../../utils/i18n';
 
@@ -29,8 +30,12 @@ export function Modal({
   }, [closeOnEscape, isOpen, onClose]);
 
   useEffect(() => {
+    const eventHandler = (e: Event) => {
+      handleKeyDown(e as KeyboardEvent);
+    };
+
     if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
+      addKeyListener(document, eventHandler);
       // 防止背景滚动
       document.body.style.overflow = 'hidden';
     } else {
@@ -38,7 +43,7 @@ export function Modal({
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', eventHandler);
       document.body.style.overflow = '';
     };
   }, [isOpen, handleKeyDown]);

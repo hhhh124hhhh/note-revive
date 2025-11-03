@@ -104,48 +104,359 @@ class NoteReviveDB extends Dexie {
   constructor() {
     super('NoteReviveDB');
 
-    this.version(1).stores({
+    // 语义化版本管理
+    const DATABASE_VERSIONS = {
+      CORE_FEATURES: 1,    // 基础便签功能
+      TAGS_SYSTEM: 2,      // 标签系统
+      AI_BASIC: 3,         // 基础AI功能
+      AI_ENHANCED: 4,      // 增强AI功能
+      STABILITY_FIXES: 5   // 稳定性修复和优化
+    };
+
+    // 版本1：基础便签功能
+    this.version(DATABASE_VERSIONS.CORE_FEATURES).stores({
       notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
       tags: 'id, name, createdAt',
       activities: 'id, type, timestamp',
       userPoints: 'id'
     });
 
-    this.version(2).stores({
+    // 版本2：添加设置和快捷键支持
+    this.version(DATABASE_VERSIONS.TAGS_SYSTEM).stores({
       notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
       tags: 'id, name, createdAt',
       activities: 'id, type, timestamp',
       userPoints: 'id',
-      settings: 'id, theme, fontSize, language',
+      settings: 'id, theme, fontSize, autoSave, language, exportFormat, aiEnabled',
       customShortcuts: 'id, action, enabled'
+    }).upgrade(async tx => {
+      console.log('🔄 升级到版本2：添加设置和快捷键支持...');
+      await initDefaultSettings();
+      await initDefaultShortcuts();
     });
 
-    this.version(3).stores({
+    // 版本3：添加基础AI建议功能
+    this.version(DATABASE_VERSIONS.AI_BASIC).stores({
       notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
       tags: 'id, name, createdAt',
       activities: 'id, type, timestamp',
       userPoints: 'id',
-      settings: 'id, theme, fontSize, language',
+      settings: 'id, theme, fontSize, autoSave, language, exportFormat, aiEnabled',
       customShortcuts: 'id, action, enabled',
       aiSuggestions: '++id, noteId, suggestionType, lastAnalyzed'
+    }).upgrade(async tx => {
+      console.log('🔄 升级到版本3：添加基础AI建议功能...');
+      // 清理任何现有的测试数据，确保干净的状态
+      await tx.table('aiSuggestions').clear();
     });
 
-    this.version(4).stores({
+    // 版本4：增强AI功能（提供商管理、使用统计、缓存）
+    this.version(DATABASE_VERSIONS.AI_ENHANCED).stores({
       notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
       tags: 'id, name, createdAt',
       activities: 'id, type, timestamp',
       userPoints: 'id',
-      settings: 'id, theme, fontSize, language',
+      settings: 'id, theme, fontSize, autoSave, language, exportFormat, aiEnabled',
       customShortcuts: 'id, action, enabled',
       aiSuggestions: '++id, noteId, suggestionType, lastAnalyzed',
-      aiProviders: '++id, type, enabled, name, lastTested',
+      aiProviders: '++id, type, enabled, name, lastTested, createdAt, updatedAt',
       aiModelUsage: '++id, providerId, modelId, useCase, lastUsed',
       aiModelCache: '++id, providerId, modelId, expiresAt'
+    }).upgrade(async tx => {
+      console.log('🔄 升级到版本4：增强AI功能...');
+      await initDefaultAIProviders();
+      // 清理可能的无效缓存数据
+      await tx.table('aiModelCache').clear();
     });
+
+    // 版本5：稳定性修复和优化
+    this.version(DATABASE_VERSIONS.STABILITY_FIXES).stores({
+      notes: 'id, createdAt, updatedAt, status, isPrivate, *tags',
+      tags: 'id, name, createdAt',
+      activities: 'id, type, timestamp',
+      userPoints: 'id',
+      settings: 'id, theme, fontSize, autoSave, language, exportFormat, aiEnabled',
+      customShortcuts: 'id, action, enabled',
+      aiSuggestions: '++id, noteId, suggestionType, lastAnalyzed, [noteId+suggestionType]',
+      aiProviders: '++id, type, enabled, name, lastTested, createdAt, updatedAt',
+      aiModelUsage: '++id, providerId, modelId, useCase, lastUsed, [providerId+modelId]',
+      aiModelCache: '++id, providerId, modelId, expiresAt, [providerId+modelId]'
+    }).upgrade(async tx => {
+      console.log('🔄 升级到版本5：稳定性和性能优化...');
+      // 优化数据完整性
+      await this.validateAndCleanData(tx);
+    });
+
+    // 数据库错误处理和自动恢复
+    this.open().catch(async error => {
+      console.error('🚨 数据库打开失败:', error);
+
+      const errorInfo = this.classifyDatabaseError(error);
+      console.error('错误分类:', errorInfo.type, errorInfo.severity);
+
+      if (errorInfo.canAutoRecover) {
+        console.log('🔄 尝试自动恢复...');
+        try {
+          await this.attemptAutoRecovery(errorInfo);
+          console.log('✅ 自动恢复成功');
+        } catch (recoveryError) {
+          console.error('❌ 自动恢复失败:', recoveryError);
+          await this.handleCriticalError(error, errorInfo);
+        }
+      } else {
+        await this.handleCriticalError(error, errorInfo);
+      }
+    });
+  }
+
+  // 数据验证和清理方法
+  private async validateAndCleanData(tx: any): Promise<void> {
+    console.log('🔍 开始数据验证和清理...');
+
+    try {
+      // 验证并清理AI相关表的数据
+      await this.validateAITables(tx);
+
+      // 清理过期的缓存和建议
+      await this.cleanupExpiredData(tx);
+
+      console.log('✅ 数据验证和清理完成');
+    } catch (error) {
+      console.error('❌ 数据验证失败:', error);
+      throw error;
+    }
+  }
+
+  private async validateAITables(tx: any): Promise<void> {
+    // 验证AI提供商表
+    const providers = await tx.table('aiProviders').toArray();
+    for (const provider of providers) {
+      if (!provider.name || !provider.type) {
+        console.warn('发现无效的AI提供商记录:', provider);
+        await tx.table('aiProviders').delete(provider.id);
+      }
+    }
+
+    // 验证模型使用统计
+    const usageRecords = await tx.table('aiModelUsage').toArray();
+    for (const record of usageRecords) {
+      if (record.successRate < 0 || record.successRate > 1) {
+        console.warn('发现无效的使用统计记录:', record);
+        await tx.table('aiModelUsage').delete(record.id);
+      }
+    }
+  }
+
+  private async cleanupExpiredData(tx: any): Promise<void> {
+    const now = new Date();
+
+    // 清理过期的AI建议（超过7天）
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    await tx.table('aiSuggestions')
+      .where('lastAnalyzed')
+      .below(sevenDaysAgo)
+      .delete();
+
+    // 清理过期的模型缓存
+    await tx.table('aiModelCache')
+      .where('expiresAt')
+      .below(now)
+      .delete();
+  }
+
+  // 数据库错误分类
+  private classifyDatabaseError(error: any): {
+    type: 'SCHEMA_ERROR' | 'QUOTA_ERROR' | 'CORRUPTION_ERROR' | 'UNKNOWN_ERROR';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    canAutoRecover: boolean;
+    userMessage: string;
+  } {
+    if (error.name === 'SchemaError' || error.name === 'VersionError') {
+      return {
+        type: 'SCHEMA_ERROR',
+        severity: 'HIGH',
+        canAutoRecover: false,
+        userMessage: '数据库结构不兼容，需要清理和重新初始化'
+      };
+    }
+
+    if (error.name === 'QuotaExceededError') {
+      return {
+        type: 'QUOTA_ERROR',
+        severity: 'MEDIUM',
+        canAutoRecover: true,
+        userMessage: '存储空间不足，正在清理缓存数据...'
+      };
+    }
+
+    if (error.name === 'InvalidStateError' || error.message.includes('corrupted')) {
+      return {
+        type: 'CORRUPTION_ERROR',
+        severity: 'CRITICAL',
+        canAutoRecover: false,
+        userMessage: '数据库损坏，需要重新创建'
+      };
+    }
+
+    return {
+      type: 'UNKNOWN_ERROR',
+      severity: 'HIGH',
+      canAutoRecover: false,
+      userMessage: '未知数据库错误，请联系技术支持'
+    };
+  }
+
+  // 自动恢复尝试
+  private async attemptAutoRecovery(errorInfo: any): Promise<void> {
+    switch (errorInfo.type) {
+      case 'QUOTA_ERROR':
+        // 清理缓存释放空间
+        await this.performCacheCleanup();
+        break;
+
+      default:
+        throw new Error(`不支持自动恢复的错误类型: ${errorInfo.type}`);
+    }
+  }
+
+  private async performCacheCleanup(): Promise<void> {
+    if (!this.isOpen()) {
+      await this.open();
+    }
+
+    console.log('🧹 执行缓存清理...');
+
+    // 清理AI模型缓存
+    await this.aiModelCache.clear();
+
+    // 清理过期的AI建议
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    await this.aiSuggestions
+      .where('lastAnalyzed')
+      .below(thirtyDaysAgo)
+      .delete();
+
+    console.log('✅ 缓存清理完成');
+  }
+
+  // 处理严重错误
+  private async handleCriticalError(error: any, errorInfo: any): Promise<void> {
+    console.error('🚨 处理严重数据库错误:', errorInfo);
+
+    // 创建备份（如果可能）
+    try {
+      await this.createEmergencyBackup();
+    } catch (backupError) {
+      console.error('❌ 紧急备份失败:', backupError);
+    }
+
+    // 设置全局错误状态，让应用层处理
+    if (typeof window !== 'undefined') {
+      (window as any).__NOTE_REVIVE_DB_ERROR_INFO__ = {
+        error: error.message,
+        type: errorInfo.type,
+        severity: errorInfo.severity,
+        userMessage: errorInfo.userMessage,
+        timestamp: new Date().toISOString(),
+        requiresUserAction: true
+      };
+    }
+
+    // 抛出错误让应用层知道数据库不可用
+    throw new DatabaseError(errorInfo.userMessage, error, errorInfo.type);
+  }
+
+  private async createEmergencyBackup(): Promise<void> {
+    console.log('💾 创建紧急数据备份...');
+
+    try {
+      // 备份核心数据到localStorage
+      const coreData = {
+        notes: await this.notes.limit(100).toArray(), // 只备份最近100条便签
+        settings: await this.settings.toArray(),
+        tags: await this.tags.toArray(),
+        timestamp: new Date().toISOString()
+      };
+
+      localStorage.setItem('note_revive_emergency_backup', JSON.stringify(coreData));
+      console.log('✅ 紧急备份创建成功');
+    } catch (error) {
+      console.error('❌ 紧急备份失败:', error);
+      throw error;
+    }
+  }
+}
+
+// 自定义数据库错误类
+class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public originalError: Error,
+    public errorType: string
+  ) {
+    super(message);
+    this.name = 'DatabaseError';
   }
 }
 
 export const db = new NoteReviveDB();
+
+// 数据库状态检查函数
+export function isDatabaseOpen(): boolean {
+  try {
+    return db.isOpen();
+  } catch {
+    return false;
+  }
+}
+
+export async function ensureDatabaseOpen(): Promise<void> {
+  if (!isDatabaseOpen()) {
+    console.log('🔧 数据库已关闭，尝试重新打开...');
+    try {
+      await db.open();
+      console.log('✅ 数据库重新打开成功');
+    } catch (error) {
+      console.error('❌ 数据库重新打开失败:', error);
+      throw error;
+    }
+  }
+}
+
+// 安全的数据库操作包装器
+export async function safeDbOperation<T>(
+  operation: () => Promise<T>,
+  retryCount = 3,
+  retryDelay = 100
+): Promise<T> {
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt <= retryCount; attempt++) {
+    try {
+      // 确保数据库打开
+      await ensureDatabaseOpen();
+
+      // 执行操作
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+
+      // 如果是数据库关闭错误，尝试重新打开
+      if (error.name === 'DatabaseClosedError' && attempt < retryCount) {
+        console.log(`🔄 数据库操作失败，重试 (${attempt + 1}/${retryCount + 1})...`, error.message);
+
+        // 等待一段时间后重试
+        await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+        continue;
+      }
+
+      // 其他错误或重试次数用完，抛出错误
+      throw error;
+    }
+  }
+
+  throw lastError;
+}
 
 // 加密密钥（实际应用中应该让用户设置）
 const ENCRYPTION_KEY = 'note-revive-secret-key-2025';
@@ -399,8 +710,11 @@ export async function updateSettings(updates: Partial<DbSettings>): Promise<void
 
 // 初始化默认快捷键
 export async function initDefaultShortcuts(): Promise<void> {
-  const existingCount = await db.customShortcuts.count();
-  if (existingCount === 0) {
+  try {
+    // 使用更安全的方式检查是否已存在默认快捷键
+    const existingShortcuts = await db.customShortcuts.toArray();
+    
+    // 定义默认快捷键
     const defaultShortcuts: DbCustomShortcut[] = [
       { id: 'default-toggleShortcuts', name: '打开快捷面板', keys: 'Ctrl+K', action: 'toggleShortcuts', enabled: true },
       { id: 'default-newNote', name: '新建便签', keys: 'Ctrl+N', action: 'newNote', enabled: true },
@@ -411,7 +725,31 @@ export async function initDefaultShortcuts(): Promise<void> {
       { id: 'default-exportData', name: '导出数据', keys: 'Ctrl+Shift+E', action: 'exportData', enabled: true },
       { id: 'default-focusSearch', name: '聚焦搜索框', keys: 'Ctrl+Shift+F', action: 'focusSearch', enabled: true }
     ];
-    await db.customShortcuts.bulkAdd(defaultShortcuts);
+    
+    // 检查是否已存在默认快捷键（通过检查ID）
+    const hasDefaultShortcuts = existingShortcuts.some(shortcut => 
+      defaultShortcuts.some(defaultShortcut => defaultShortcut.id === shortcut.id)
+    );
+    
+    // 如果没有默认快捷键，则添加
+    if (!hasDefaultShortcuts && existingShortcuts.length === 0) {
+      await db.customShortcuts.bulkAdd(defaultShortcuts);
+    } else if (!hasDefaultShortcuts) {
+      // 如果有一些快捷键但没有默认快捷键，则只添加缺失的默认快捷键
+      for (const shortcut of defaultShortcuts) {
+        const exists = existingShortcuts.some(s => s.id === shortcut.id);
+        if (!exists) {
+          await db.customShortcuts.add(shortcut);
+        }
+      }
+    }
+  } catch (error: any) {
+    // 处理可能的约束错误
+    if (error && error.name === 'ConstraintError') {
+      console.warn('快捷键已存在，跳过初始化');
+    } else {
+      throw error;
+    }
   }
 }
 

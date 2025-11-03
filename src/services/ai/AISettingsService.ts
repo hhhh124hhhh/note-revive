@@ -39,6 +39,7 @@ export interface ProviderTestResult {
 
 export class AISettingsService {
   private modelManager: ModelManager;
+  private initialized = false;
 
   constructor() {
     this.modelManager = new ModelManager();
@@ -48,19 +49,33 @@ export class AISettingsService {
    * 初始化AI设置服务
    */
   async initialize(): Promise<void> {
+    // 防止重复初始化
+    if (this.initialized) {
+      console.log('AI设置服务已经初始化过了，跳过');
+      return;
+    }
+
     try {
-      console.log('开始初始化AI设置服务...');
+      console.log('🚀 开始初始化AI设置服务...');
+
+      // 添加延迟以确保数据库完全就绪
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // 初始化默认提供商
-      console.log('初始化默认AI提供商...');
+      console.log('📦 初始化默认AI提供商...');
       await initDefaultAIProviders();
 
       // 验证提供商是否正确创建
       const providers = await getAIProviders();
-      console.log(`已加载 ${providers.length} 个AI提供商:`, providers.map(p => p.name));
+      console.log(`✅ 已加载 ${providers.length} 个AI提供商:`, providers.map(p => ({
+        name: p.name,
+        type: p.type,
+        enabled: p.enabled,
+        hasApiKey: !!p.apiKey
+      })));
 
       // 从环境变量加载初始配置
-      console.log('从环境变量加载配置...');
+      console.log('⚙️ 从环境变量加载配置...');
       await this.loadFromEnvironment();
 
       // 迁移旧版本设置
@@ -72,8 +87,27 @@ export class AISettingsService {
       await this.initializeModelManager();
 
       console.log('AI设置服务初始化完成');
+      this.initialized = true;
     } catch (error) {
       console.error('AI设置服务初始化失败:', error);
+
+      // 如果是数据库相关错误，尝试强制重置
+      if (error instanceof Error &&
+          (error.message.includes('SchemaError') ||
+           error.message.includes('KeyPath') ||
+           error.message.includes('indexed') ||
+           error.message.includes('aiProviders'))) {
+
+        console.warn('🚨 检测到数据库错误，尝试强制重置...');
+
+        try {
+          const { forceResetAllDatabases } = await import('../../utils/forceDatabaseReset');
+          await forceResetAllDatabases();
+        } catch (resetError) {
+          console.error('强制重置失败:', resetError);
+        }
+      }
+
       throw error; // 重新抛出错误以便上层处理
     }
   }
@@ -468,25 +502,28 @@ export class AISettingsService {
    */
   private async loadFromEnvironment(): Promise<void> {
     try {
+      console.log('📥 读取环境配置...');
       const envConfig = envConfigService.getConfig();
+      console.log('📊 环境配置提供商数量:', envConfig.providers.length);
       const existingProviders = await getAIProviders();
+      console.log('📋 已存在的数据库提供商数量:', existingProviders.length);
 
       // 为每个环境配置的提供商创建或更新数据库记录
       for (const envProvider of envConfig.providers) {
         if (envProvider.apiKey) {
+          console.log(`⚙️ 处理提供商: ${envProvider.name} (${envProvider.type})`);
           const existingProvider = existingProviders.find(p => p.type === envProvider.type);
 
           if (existingProvider) {
-            // 更新现有提供商（仅当没有用户设置时）
-            if (!existingProvider.apiKey) {
-              await updateAIProvider(existingProvider.id!, {
-                apiKey: encryptContent(envProvider.apiKey),
-                enabled: envProvider.enabled,
-                selectedModel: envProvider.defaultModel,
-                testStatus: 'success' as const,
-                testMessage: '从环境变量加载'
-              });
-            }
+            // 更新现有提供商（始终更新环境变量配置）
+            await updateAIProvider(existingProvider.id!, {
+              apiKey: encryptContent(envProvider.apiKey),
+              enabled: envProvider.enabled,
+              selectedModel: envProvider.defaultModel,
+              testStatus: 'success' as const,
+              testMessage: '从环境变量加载'
+            });
+            console.log(`✅ 更新提供商 ${envProvider.name} 的环境配置`);
           } else {
             // 创建新的提供商记录
             await addAIProvider({

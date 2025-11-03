@@ -13,17 +13,22 @@ interface ProviderConfigProps {
   provider: DbAIProvider;
   onUpdate?: (provider: DbAIProvider) => void;
   onTest?: (result: any) => void;
+  onModelSelect?: (modelId: string) => void;
+  selectedModel?: string;
 }
 
-export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigProps) {
+export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, selectedModel: externalSelectedModel }: ProviderConfigProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [internalSelectedModel, setInternalSelectedModel] = useState<string>('');
   const [customConfig, setCustomConfig] = useState<CustomProviderConfig | null>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [showModels, setShowModels] = useState(false);
+
+  // 使用外部传入的selectedModel或内部状态
+  const selectedModel = externalSelectedModel !== undefined ? externalSelectedModel : internalSelectedModel;
 
   useEffect(() => {
     // 初始化表单数据
@@ -33,7 +38,7 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
     }
 
     if (provider.selectedModel) {
-      setSelectedModel(provider.selectedModel);
+      setInternalSelectedModel(provider.selectedModel);
     }
 
     if (provider.config && provider.type === 'custom') {
@@ -121,8 +126,20 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
   };
 
   const handleModelSelect = (model: ModelInfo) => {
-    setSelectedModel(model.id);
+    setInternalSelectedModel(model.id);
+    if (onModelSelect) {
+      onModelSelect(model.id);
+    }
     setIsEditing(true);
+  };
+
+  // 添加一个函数来处理模型选择的变更
+  const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const modelId = e.target.value;
+    setInternalSelectedModel(modelId);
+    if (onModelSelect) {
+      onModelSelect(modelId);
+    }
   };
 
   const getStatusColor = () => {
@@ -365,6 +382,33 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
         </div>
       </div>
 
+      {/* 模型选择下拉框 - 在API密钥配置下方添加 */}
+      {provider.apiKey && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            选择模型
+          </label>
+          {models.length > 0 ? (
+            <select
+              value={selectedModel || provider.selectedModel || ''}
+              onChange={handleModelChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">请选择模型</option>
+              {models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name} - {model.description}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
+              请先加载模型列表
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 模型列表 */}
       {showModels && (
         <div>
@@ -397,7 +441,10 @@ export function ProviderConfig({ provider, onUpdate, onTest }: ProviderConfigPro
                     </div>
                     <button
                       onClick={() => {
-                        setSelectedModel('');
+                        setInternalSelectedModel('');
+                        if (onModelSelect) {
+                          onModelSelect('');
+                        }
                         setIsEditing(true);
                       }}
                       className="text-sm text-blue-600 hover:text-blue-800"

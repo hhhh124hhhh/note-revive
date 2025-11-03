@@ -223,7 +223,7 @@ export class KimiProvider implements ModelProviderWithTest {
       // 未知模型，使用默认配置
       modelInfo = {
         id: modelId,
-        name: modelId.replace('moonshot-', 'Moonshot ').replace(/-/g, ' ').split(' ').map(word =>
+        name: modelId.replace('moonshot-', 'Moonshot ').replace(/-/g, ' ').split(' ').map((word: string) =>
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' '),
         description: 'Kimi Moonshot模型',

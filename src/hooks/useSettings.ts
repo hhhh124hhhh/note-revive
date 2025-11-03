@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DbSettings, Theme } from '../types';
-import { getSettings, updateSettings, initDefaultSettings } from '../db';
+import { getSettings, updateSettings, initDefaultSettings, safeDbOperation } from '../db';
 import { THEMES } from '../constants/shortcuts';
+
+// AI 功能环境变量检测函数
+const isAIEnabled = (): boolean => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_AI_ENABLED !== 'false';
+  }
+  return true; // 默认启用，用于向后兼容
+};
 
 interface UseSettingsOptions {
   onThemeChange?: (theme: Theme) => void;
@@ -17,10 +25,37 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
     const loadSettings = async () => {
       try {
         setLoading(true);
-        const settingsData = await getSettings();
+        console.log('🔧 开始加载设置...');
+
+        // 使用安全的数据库操作包装器，包含重试机制
+        const settingsData = await safeDbOperation(async () => {
+          return await getSettings();
+        });
+
+        console.log('✅ 设置加载成功:', settingsData);
         setSettings(settingsData);
       } catch (error) {
-        console.error('加载设置失败:', error);
+        console.error('❌ 加载设置失败:', error);
+
+        // 提供用户友好的错误处理
+        if (error instanceof Error && error.name === 'DatabaseClosedError') {
+          console.warn('💡 数据库连接问题，尝试重新加载页面...');
+          // 可以考虑在几次失败后提示用户刷新页面
+        } else {
+          console.warn('💡 设置加载失败，使用默认设置');
+          // 设置默认值作为降级方案
+          setSettings({
+            id: 1,
+            theme: 'light',
+            fontSize: 'medium',
+            autoSave: true,
+            language: 'zh',
+            exportFormat: 'json',
+            aiEnabled: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+        }
       } finally {
         setLoading(false);
       }
@@ -35,9 +70,16 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
 
     try {
       setUpdating(true);
-      await updateSettings(updates);
+      console.log('🔧 开始更新设置:', updates);
+
+      // 使用安全的数据库操作包装器
+      await safeDbOperation(async () => {
+        await updateSettings(updates);
+      });
+
       const newSettings = { ...settings, ...updates };
       setSettings(newSettings);
+      console.log('✅ 设置更新成功:', newSettings);
 
       // 如果主题改变，应用主题
       if (updates.theme && options.onThemeChange) {
@@ -57,7 +99,16 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
 
       return newSettings;
     } catch (error) {
-      console.error('更新设置失败:', error);
+      console.error('❌ 更新设置失败:', error);
+
+      // 提供用户友好的错误处理
+      if (error instanceof Error && error.name === 'DatabaseClosedError') {
+        console.warn('💡 数据库连接问题，设置更改未保存');
+        // 可以考虑显示用户提示
+      } else {
+        console.warn('💡 设置更新失败，请重试');
+      }
+
       throw error;
     } finally {
       setUpdating(false);
@@ -206,6 +257,14 @@ export const useSettings = (options: UseSettingsOptions = {}) => {
     language: settings?.language || 'zh',
     autoSave: settings?.autoSave ?? true,
     exportFormat: settings?.exportFormat || 'json',
-    aiEnabled: settings?.aiEnabled ?? false
+    aiEnabled: settings?.aiEnabled ?? false,
+
+    // AI 功能可用性检查方法
+    isAIFeatureAvailable: isAIEnabled,
+    getAIStatus: () => ({
+      enabled: settings?.aiEnabled ?? false,
+      available: isAIEnabled(),
+      canUse: (settings?.aiEnabled ?? false) && isAIEnabled()
+    })
   };
 };

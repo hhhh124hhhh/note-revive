@@ -106,7 +106,7 @@ export class ModelCacheManager {
       }>
     };
 
-    for (const [key, cached] of this.cache.entries()) {
+    for (const [, cached] of this.cache.entries()) {
       const cacheAge = Date.now() - cached.timestamp;
       stats.entries.push({
         provider: cached.provider,

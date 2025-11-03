@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Home,
   Search,
@@ -28,7 +28,9 @@ import {
   encryptContent,
   decryptContent,
   initDefaultSettings,
-  initDefaultShortcuts
+  initDefaultShortcuts,
+  isDatabaseOpen,
+  ensureDatabaseOpen
 } from './db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ReactMarkdown from 'react-markdown';
@@ -43,6 +45,8 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useSettings } from './hooks/useSettings';
 import { useNotifications } from './hooks/useNotifications';
 import { useDialog } from './hooks/useDialog';
+import { addKeyListener, addEventListener } from './utils/event-listener-manager';
+import { initializeErrorFilter } from './utils/error-filter';
 import ShortcutsPanel from './components/ShortcutsPanel';
 import Settings from './components/Settings';
 import NotificationPanel, { NotificationCard } from './components/NotificationPanel';
@@ -50,7 +54,7 @@ import AISearchSuggestions from './components/AISearchSuggestions';
 import RelatedNotes from './components/RelatedNotes';
 import { getTagTextColor, getTagBorderColor } from './utils/colorContrast';
 import { t } from './utils/i18n';
-import { aiSettingsService } from './services/ai/index';
+import { initializeAI } from './services/ai/index';
 
   const formatDate = (date: Date, language: 'zh' | 'en' = 'zh'): string => {
   const locale = language === 'zh' ? 'zh-CN' : 'en-US';
@@ -62,6 +66,11 @@ import { aiSettingsService } from './services/ai/index';
     minute: '2-digit'
   }).format(date);
 };
+
+// 初始化错误过滤器
+if (typeof window !== 'undefined') {
+  initializeErrorFilter();
+}
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('home');
@@ -259,7 +268,7 @@ function App() {
       setCurrentLanguage(event.detail);
     };
 
-    window.addEventListener('languagechange', handleLanguageChange as EventListener);
+    addEventListener(window, 'languagechange', handleLanguageChange as EventListener);
 
     // 初始化语言设置
     const savedLanguage = localStorage.getItem('language') as 'zh' | 'en';
@@ -275,9 +284,10 @@ function App() {
     };
   }, []);
 
-  // ESC键全局处理
+  // 处理键盘事件
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 处理 ESC 键关闭当前视图
       if (e.key === 'Escape') {
         if (viewingNote) {
           e.preventDefault();
@@ -287,28 +297,106 @@ function App() {
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    // 使用事件监听器管理器
+    const keyboardHandler = (e: Event) => {
+      handleKeyDown(e as KeyboardEvent);
+    };
+    
+    addKeyListener(document, keyboardHandler);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', keyboardHandler);
     };
   }, [viewingNote]);
 
   // 初始化
   useEffect(() => {
+    // 添加一个标志来防止重复初始化
+    let isInitializing = false;
+    
     const initializeApp = async () => {
+      // 防止重复初始化
+      if (isInitializing) {
+        console.log('🔄 应用已在初始化中，跳过重复初始化');
+        return;
+      }
+      
+      isInitializing = true;
+      
       try {
-        // 初始化轻量级 AI 服务
-        const { aiService } = await import('../services/ai');
-        await aiService.init();
-        // 设置全局 AI 服务
-        window.aiService = aiService;
+        console.log('🚀 开始初始化应用...');
 
+        // 强制数据库检查和修复
+        console.log('🔍 检查数据库状态...');
+        const { checkAndFixDatabase } = await import('./utils/forceDatabaseReset');
+        const wasFixed = await checkAndFixDatabase();
+
+        if (wasFixed) {
+          console.log('🔄 数据库已修复，页面将重新加载...');
+          return; // 页面会自动重新加载
+        }
+
+        // 数据库健康检查（增加重试机制）
+        console.log('🏥 检查数据库健康状态...');
+        const { checkDatabaseHealth } = await import('./utils/databaseReset');
+        
+        // 尝试多次检查数据库健康状态，避免临时性错误
+        let healthStatus;
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+          try {
+            healthStatus = await checkDatabaseHealth();
+            if (healthStatus.healthy) {
+              break;
+            }
+          } catch (error) {
+            console.warn(`数据库健康检查失败 (尝试 ${retryCount + 1}/${maxRetries}):`, error);
+          }
+          
+          if (retryCount < maxRetries - 1) {
+            // 等待一段时间后重试
+            await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
+          }
+          retryCount++;
+        }
+
+        if (!healthStatus || !healthStatus.healthy) {
+          console.error('🚨 数据库健康检查失败:', healthStatus?.issues || '未知错误');
+          // 只有在严重问题时才重置数据库
+          const seriousIssues = healthStatus?.issues.some(issue => 
+            issue.includes('corrupt') || 
+            issue.includes('Schema') || 
+            issue.includes('结构异常')
+          );
+          
+          if (seriousIssues) {
+            console.log('🔧 检测到严重数据库问题，准备重置...');
+            const { safeResetDatabase } = await import('./utils/databaseReset');
+            const wasReset = await safeResetDatabase();
+            if (wasReset) {
+              return; // 数据库已重置，页面会重新加载
+            }
+          } else {
+            console.log('⚠️ 检测到轻微数据库问题，继续运行应用...');
+          }
+        } else {
+          console.log('✅ 数据库健康状态正常');
+        }
+
+        // 初始化核心服务（不依赖 AI，避免与 useSettings 冲突）
+        console.log('🔧 正在初始化核心服务...');
         await Promise.all([
           initUserPoints(),
-          initDefaultSettings(),
-          initDefaultShortcuts(),
-          aiSettingsService.initialize()
+          initDefaultShortcuts()
         ]);
+        console.log('✅ 核心服务初始化完成（设置由 useSettings Hook 管理）');
+
+        // 异步初始化 AI 功能（可选，不阻塞应用启动）
+        console.log('🤖 开始异步初始化 AI 功能...');
+        initializeAI().catch(error => {
+          console.warn('AI 功能初始化失败，应用将在无 AI 模式下运行:', error);
+        });
 
         const checkReminder = async () => {
           const needsReminder = await checkReviewReminder();
@@ -318,7 +406,23 @@ function App() {
         };
         checkReminder();
       } catch (error) {
-        console.error('应用初始化失败:', error);
+        console.error('❌ 应用初始化失败:', error);
+        console.error('📍 错误详情:', {
+          name: (error as Error).name,
+          message: (error as Error).message,
+          stack: (error as Error).stack
+        });
+        
+        // 只有在严重错误时才考虑重新加载
+        if (error instanceof Error && 
+            (error.message.includes('corrupt') || 
+             error.message.includes('Schema') || 
+             error.message.includes('version'))) {
+          console.log('🔧 检测到严重错误，准备重置应用...');
+          // 可以在这里添加用户提示，询问是否重置应用
+        }
+      } finally {
+        isInitializing = false;
       }
     };
 
@@ -334,7 +438,7 @@ function App() {
     };
 
     handleResize();
-    window.addEventListener('resize', handleResize);
+    addEventListener(window, 'resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -584,7 +688,7 @@ function App() {
       // 获取所有便签的标题和内容用于AI分析
       const allNotesText = notes.map(note => ({
         id: note.id!,
-        title: note.title,
+        title: note.title || '无标题',
         content: note.content.length > 200 ? note.content.substring(0, 200) + '...' : note.content,
         tags: note.tags || []
       }));
@@ -592,7 +696,7 @@ function App() {
       // 获取标签便签的详细信息
       const tagNotesText = tagNotes.map(note => ({
         id: note.id!,
-        title: note.title,
+        title: note.title || '无标题',
         content: note.content.length > 300 ? note.content.substring(0, 300) + '...' : note.content,
         tags: note.tags || []
       }));
@@ -610,12 +714,12 @@ function App() {
   // 使用AI分析标签关联便签
   const findRelatedNotesForTagWithAI = async (
     tagName: string,
-    tagNotes: Array<{id: number, title: string, content: string, tags: string[]}>,
-    allNotes: Array<{id: number, title: string, content: string, tags: string[]}>
+    tagNotes: any[],
+    allNotes: any[]
   ) => {
     try {
       // 调用AI服务分析便签关联性
-      const relatedNotes = await window.aiService.analyzeTagRelatedNotes(tagName, tagNotes, allNotes);
+      const relatedNotes = await window.aiService?.analyzeTagRelatedNotes(tagName, tagNotes, allNotes);
 
       if (relatedNotes && relatedNotes.length > 0) {
         // 显示AI分析结果
@@ -659,9 +763,9 @@ function App() {
       }
 
       // 检查标题关键词匹配
-      const titleWords = note.title.toLowerCase().split(/\s+/);
+      const titleWords = (note.title || '').toLowerCase().split(/\s+/);
       const tagNoteWords = tagNotes.flatMap(tn => tn.title.toLowerCase().split(/\s+/));
-      const commonWords = titleWords.filter(word =>
+      const commonWords = titleWords.filter((word: string) =>
         word.length > 2 && tagNoteWords.includes(word)
       );
 
@@ -694,7 +798,7 @@ function App() {
       <div style="max-width: 600px; max-height: 500px; overflow-y: auto;">
         <h3>标签 "${tagName}" 的关联便签 (${method})</h3>
         <div style="margin-top: 16px;">
-          ${relatedNotes.map((item, index) => `
+          ${relatedNotes.map((item) => `
             <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
                 <h4 style="margin: 0; font-size: 14px; font-weight: 600;">${item.note.title}</h4>
@@ -708,7 +812,7 @@ function App() {
               </div>
               <div style="margin-top: 8px;">
                 ${item.note.tags && item.note.tags.length > 0 ?
-                  item.note.tags.map(tag =>
+                  item.note.tags.map((tag: string) =>
                     `<span style="display: inline-block; margin: 2px 4px 2px 0; padding: 2px 6px; background: #f3f4f6; border-radius: 4px; font-size: 10px;">${tag}</span>`
                   ).join('')
                   : '无标签'

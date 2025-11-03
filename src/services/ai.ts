@@ -8,6 +8,9 @@ export interface AIService {
   name: string;
   provider: 'openai' | 'claude' | 'local' | 'mock';
   enabled: boolean;
+  init(): Promise<void>;
+  generateSearchSuggestions(query: string, notes: any[]): Promise<SearchSuggestion[]>;
+  analyzeTagRelatedNotes(tagName: string, tagNotes: any[], allNotes: any[]): Promise<any[]>;
 }
 
 // 搜索建议接口
@@ -197,8 +200,8 @@ export class LightweightAIService {
       const noteContent = note.content.toLowerCase();
 
       // 提取有意义的词汇（长度大于2的词）
-      const targetWords = new Set(targetContent.split(/\s+/).filter(word => word.length > 2));
-      const noteWords = new Set(noteContent.split(/\s+/).filter(word => word.length > 2));
+      const targetWords = new Set(targetContent.split(/\s+/).filter((word: string) => word.length > 2));
+      const noteWords = new Set(noteContent.split(/\s+/).filter((word: string) => word.length > 2));
 
       // 计算词汇重叠度
       const commonWords = [...targetWords].filter(word => noteWords.has(word));
@@ -379,6 +382,121 @@ export class LightweightAIService {
       });
     } catch (error) {
       console.error('保存AI设置失败:', error);
+    }
+  }
+
+  /**
+   * 生成搜索建议
+   */
+  async generateSearchSuggestions(query: string, notes: any[]): Promise<SearchSuggestion[]> {
+    try {
+      const suggestions: SearchSuggestion[] = [];
+      const queryWords = query.toLowerCase().split(/\s+/);
+
+      notes.forEach(note => {
+        let relevanceScore = 0;
+        const matchedKeywords: string[] = [];
+
+        // 检查标题匹配
+        const title = note.title || '';
+        const titleLower = title.toLowerCase();
+        queryWords.forEach(word => {
+          if (titleLower.includes(word)) {
+            relevanceScore += 0.5;
+            matchedKeywords.push(word);
+          }
+        });
+
+        // 检查内容匹配
+        const contentLower = note.content.toLowerCase();
+        queryWords.forEach(word => {
+          if (contentLower.includes(word)) {
+            relevanceScore += 0.3;
+            matchedKeywords.push(word);
+          }
+        });
+
+        // 检查标签匹配
+        if (note.tags) {
+          note.tags.forEach((tag: string) => {
+            queryWords.forEach(word => {
+              if (tag.toLowerCase().includes(word)) {
+                relevanceScore += 0.4;
+                matchedKeywords.push(tag);
+              }
+            });
+          });
+        }
+
+        if (relevanceScore > 0.2) {
+          suggestions.push({
+            noteId: note.id,
+            relevanceScore: Math.min(relevanceScore, 1.0),
+            reason: `匹配关键词: ${[...new Set(matchedKeywords)].slice(0, 3).join(', ')}`,
+            matchedKeywords: [...new Set(matchedKeywords)]
+          });
+        }
+      });
+
+      return suggestions
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, 5);
+    } catch (error) {
+      console.error('生成搜索建议失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 分析标签关联便签
+   */
+  async analyzeTagRelatedNotes(
+    tagName: string,
+    tagNotes: any[],
+    allNotes: any[]
+  ): Promise<any[]> {
+    try {
+      // 使用简单的关键词匹配算法
+      const results: any[] = [];
+
+      for (const tagNote of tagNotes) {
+        for (const note of allNotes) {
+          if (note.id === tagNote.id) continue;
+
+          let score = 0;
+          const reasons: string[] = [];
+
+          // 检查共同标签
+          const commonTags = tagNote.tags.filter((tag: string) => note.tags.includes(tag));
+          if (commonTags.length > 0) {
+            score += commonTags.length * 10;
+            reasons.push(`共同标签: ${commonTags.join(', ')}`);
+          }
+
+          // 检查内容相似性
+          const tagWords = new Set(tagNote.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
+          const noteWords = new Set(note.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
+          const commonWords = [...tagWords].filter((w: unknown) => noteWords.has(w));
+
+          if (commonWords.length > 0) {
+            score += commonWords.length * 2;
+            reasons.push(`内容关键词: ${commonWords.slice(0, 3).join(', ')}`);
+          }
+
+          if (score > 5) {
+            results.push({
+              note: note,
+              confidence: Math.min(score / 50, 1.0),
+              reasons: reasons
+            });
+          }
+        }
+      }
+
+      return results.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+    } catch (error) {
+      console.error('分析标签关联失败:', error);
+      return [];
     }
   }
 }

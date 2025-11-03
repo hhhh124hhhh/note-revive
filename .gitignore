@@ -172,3 +172,10 @@ nsis-3.zip
 # NSIS installer scripts
 *-installer.nsi
 todo.md
+.env.backup
+debug-db.html
+fix-settings-error.html
+test-no-ai-functionality.html
+test-no-ai.html
+test-settings-ai-fix.html
+test-database-fix.html

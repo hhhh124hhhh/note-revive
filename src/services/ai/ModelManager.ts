@@ -201,7 +201,7 @@ export class ModelManager {
    */
   async getRecommendedModel(
     criteria: RecommendationCriteria,
-    credentials: ProviderCredentials
+    _credentials: ProviderCredentials
   ): Promise<ModelInfo | null> {
     // 临时设置凭据到推荐引擎
     // 实际实现中可能需要更复杂的凭据管理

@@ -388,7 +388,7 @@ export class EnhancedAIService {
   /**
    * 私有方法：模拟AI响应
    */
-  private async mockAIResponse(message: string, context?: string): Promise<string> {
+  private async mockAIResponse(_message: string, _context?: string): Promise<string> {
     // 模拟网络延迟
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
 
@@ -527,6 +527,59 @@ export class EnhancedAIService {
     });
 
     return suggestions.slice(0, 5);
+  }
+
+  /**
+   * 分析标签关联便签
+   */
+  async analyzeTagRelatedNotes(
+    tagName: string,
+    tagNotes: {id: string, title: string, content: string, tags: string[]}[],
+    allNotes: {id: string, title: string, content: string, tags: string[]}[]
+  ): Promise<any[]> {
+    try {
+      // 使用简单的关键词匹配算法
+      const results: any[] = [];
+
+      for (const tagNote of tagNotes) {
+        for (const note of allNotes) {
+          if (note.id === tagNote.id) continue;
+
+          let score = 0;
+          const reasons: string[] = [];
+
+          // 检查共同标签
+          const commonTags = tagNote.tags.filter(tag => note.tags.includes(tag));
+          if (commonTags.length > 0) {
+            score += commonTags.length * 10;
+            reasons.push(`共同标签: ${commonTags.join(', ')}`);
+          }
+
+          // 检查内容相似性
+          const tagWords = new Set(tagNote.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
+          const noteWords = new Set(note.content.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2));
+          const commonWords = [...tagWords].filter((w: string) => noteWords.has(w));
+
+          if (commonWords.length > 0) {
+            score += commonWords.length * 2;
+            reasons.push(`内容关键词: ${commonWords.slice(0, 3).join(', ')}`);
+          }
+
+          if (score > 5) {
+            results.push({
+              note: note,
+              confidence: Math.min(score / 50, 1.0),
+              reasons: reasons
+            });
+          }
+        }
+      }
+
+      return results.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+    } catch (error) {
+      console.error('分析标签关联失败:', error);
+      return [];
+    }
   }
 }
 

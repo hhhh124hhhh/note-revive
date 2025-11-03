@@ -343,7 +343,7 @@ export class ModelRecommendationEngine {
   /**
    * 计算预估成本
    */
-  private calculateEstimatedCost(model: ModelInfo, criteria: RecommendationCriteria): {
+  private calculateEstimatedCost(model: ModelInfo, _criteria: RecommendationCriteria): {
     input: number;
     output: number;
     total: number;
@@ -399,7 +399,7 @@ export class ModelRecommendationEngine {
   /**
    * 生成使用建议
    */
-  private generateRecommendations(models: ModelInfo[], usageData: any[]): string[] {
+  private generateRecommendations(models: ModelInfo[], _usageData: any[]): string[] {
     const recommendations: string[] = [];
 
     if (models.length === 0) {

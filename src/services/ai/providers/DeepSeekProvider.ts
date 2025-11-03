@@ -223,7 +223,7 @@ export class DeepSeekProvider implements ModelProviderWithTest {
       // 未知模型，使用默认配置
       modelInfo = {
         id: modelId,
-        name: modelId.replace('deepseek-', 'DeepSeek ').split('-').map(word =>
+        name: modelId.replace('deepseek-', 'DeepSeek ').split('-').map((word: string) =>
           word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' '),
         description: 'DeepSeek AI模型',

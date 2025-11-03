@@ -273,7 +273,7 @@ export class CustomProvider implements ModelProviderWithTest {
       // 其他OpenAI兼容模型
       return {
         id: modelId,
-        name: modelId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        name: modelId.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         description: `${this.config.name} 模型`,
         maxTokens: 4096,
         pricing: {
@@ -343,7 +343,7 @@ export class CustomProvider implements ModelProviderWithTest {
       // 其他Claude兼容模型
       return {
         id: modelId,
-        name: model.display_name || modelId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        name: model.display_name || modelId.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         description: `${this.config.name} Claude兼容模型`,
         maxTokens: model.context_window || 100000,
         pricing: {

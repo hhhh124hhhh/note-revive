@@ -3,7 +3,6 @@
  * 用于验证所有提供商的模型拉取功能
  */
 
-import { ModelManager } from './services/ai/ModelManager';
 import { DeepSeekProvider } from './services/ai/providers/DeepSeekProvider';
 import { ZhipuProvider } from './services/ai/providers/ZhipuProvider';
 import { KimiProvider } from './services/ai/providers/KimiProvider';
@@ -28,7 +27,6 @@ async function testProviderModels() {
   console.log('🚀 开始测试AI服务商模型拉取功能...\n');
 
   const cacheManager = new ModelCacheManager();
-  const modelManager = new ModelManager();
 
   // 测试DeepSeek提供商
   console.log('📋 测试 DeepSeek 提供商...');
