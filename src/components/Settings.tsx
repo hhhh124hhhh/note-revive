@@ -236,7 +236,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, onThemeChange }) => {
             { id: 'general', label: t('basicSettings'), icon: <SettingsIcon size={16} /> },
             { id: 'shortcuts', label: t('shortcuts'), icon: <Zap size={16} /> },
             { id: 'data', label: t('dataManagement'), icon: <Database size={16} /> },
-            ...(isAIAvailable ? [{ id: 'ai', label: t('aiSettings'), icon: <Monitor size={16} /> }] : [])
+            ...(isAIAvailable ? [{ id: 'ai', label: 'AI设置（实验功能）', icon: <Monitor size={16} /> }] : [])
           ].map(tab => (
             <button
               key={tab.id}

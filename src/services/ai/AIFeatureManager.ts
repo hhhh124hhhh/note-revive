@@ -125,13 +125,20 @@ class AIFeatureManager {
     try {
       console.log('🚀 开始初始化 AI 功能...');
 
-      // 动态导入 AI 服务
-      const { aiService } = await import('../ai');
-      console.log('✅ AI 服务模块加载成功');
+      // 动态导入 AI 设置服务
+      const { aiSettingsService } = await import('./AISettingsService');
+      console.log('✅ AI 设置服务模块加载成功');
 
-      // 初始化 AI 服务
-      await aiService.init();
-      console.log('✅ AI 服务初始化成功');
+      // 初始化 AI 设置服务
+      await aiSettingsService.initialize();
+      console.log('✅ AI 设置服务初始化成功');
+
+      // 创建 AI 服务实例（整合模型管理器和设置服务）
+      const aiService = {
+        settings: aiSettingsService,
+        isAvailable: () => true,
+        getStatus: () => this.getStatus()
+      };
 
       // 设置全局 AI 服务（安全方式）
       if (typeof window !== 'undefined') {

@@ -364,7 +364,7 @@ export class EventBus {
    */
   private async generateAISuggestions(note: NoteType): Promise<void> {
     try {
-      console.log('🤖 为便签生成AI建议:', note.id);
+      console.log('🤖 为便签生成AI建议:', note.id || 'unknown');
 
       // 获取相关的便签
       const relatedNotes = await noteRepository.searchNotes(note.title || '', {
@@ -376,7 +376,7 @@ export class EventBus {
       // 保存搜索建议
       if (relatedNotes.length > 0) {
         await aiRepository.saveSuggestion({
-          noteId: note.id,
+          noteId: note.id || '',
           relatedNotes: JSON.stringify(relatedNotes.map(n => n.id)),
           searchKeywords: JSON.stringify(this.extractKeywords(note.content)),
           lastAnalyzed: new Date(),

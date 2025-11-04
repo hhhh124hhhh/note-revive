@@ -14,10 +14,43 @@ export type {
 
 export type {
   AISuggestion,
-  AIProvider,
-  AIModelUsage,
+  AIProvider as DbAIProvider,
+  AIModelUsage as DbAIModelUsage,
   AIModelCache
 } from './ai-db';
+
+// 导出数据库操作函数
+export {
+  // 核心数据库
+  getSettings,
+  updateSettings,
+  getShortcuts as getCustomShortcuts,
+  updateShortcut as updateCustomShortcut,
+  initUserPoints,
+  initDefaultSettings,
+  initDefaultShortcuts,
+  addPoints,
+  checkAchievements,
+  checkReviewReminder,
+  encryptContent,
+  decryptContent,
+  
+  // AI数据库
+  getAIProviders,
+  getEnabledAIProviders,
+  getAIProviderByType,
+  getAIProvider,
+  addAIProvider,
+  updateAIProvider,
+  deleteAIProvider,
+  toggleAIProvider,
+  updateProviderTestStatus,
+  initDefaultAIProviders,
+  recordModelUsage,
+  getModelUsageStats,
+  getMostPopularModels,
+  migrateAISettings
+} from '../db';
 
 // 向后兼容的导出（保持原有API兼容性）
 export { NoteReviveCoreDB } from './core-db';

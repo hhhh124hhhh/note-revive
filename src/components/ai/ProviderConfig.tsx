@@ -1,8 +1,3 @@
-/**
- * AI提供商配置组件
- * 用于配置和测试AI服务提供商
- */
-
 import { useState, useEffect } from 'react';
 import { DbAIProvider } from '../../db';
 import { ModelInfo, CustomProviderConfig } from '../../services/ai/types';
@@ -26,6 +21,56 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [showModels, setShowModels] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'capabilities' | 'pricing'>('name');
+  const [showModelSelectionModal, setShowModelSelectionModal] = useState(false);
+
+  // 重置搜索和排序
+  const resetSearch = () => {
+    setSearchTerm('');
+    setSortBy('name');
+  };
+
+  // 获取过滤和排序后的模型列表
+  const getFilteredAndSortedModels = () => {
+    let filtered = models;
+
+    // 应用搜索过滤
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (model) =>
+          model.name.toLowerCase().includes(searchLower) ||
+          model.description.toLowerCase().includes(searchLower) ||
+          model.provider.toLowerCase().includes(searchLower) ||
+          model.capabilities.some((cap) => cap.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // 应用排序
+    switch (sortBy) {
+      case 'capabilities':
+        return [...filtered].sort((a, b) => {
+          // 按功能数量排序
+          const aCapCount = a.capabilities.length;
+          const bCapCount = b.capabilities.length;
+          return bCapCount - aCapCount;
+        });
+      case 'pricing':
+        return [...filtered].sort((a, b) => {
+          // 按输入价格排序
+          const aPrice = a.pricing?.input || 0;
+          const bPrice = b.pricing?.input || 0;
+          return aPrice - bPrice;
+        });
+      case 'name':
+      default:
+        return [...filtered].sort((a, b) => {
+          // 按名称字母排序
+          return a.name.localeCompare(b.name);
+        });
+    }
+  };
 
   // 使用外部传入的selectedModel或内部状态
   const selectedModel = externalSelectedModel !== undefined ? externalSelectedModel : internalSelectedModel;
@@ -88,6 +133,8 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
       if (result.success && result.models) {
         setModels(result.models);
         setShowModels(true);
+        // 自动弹窗显示可选择的模型
+        setShowModelSelectionModal(true);
       }
     } catch (error) {
       console.error('测试提供商失败:', error);
@@ -142,6 +189,34 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
     }
   };
 
+  // 添加一个函数来获取提供商的官方链接
+  const getProviderLink = () => {
+    switch (provider.type) {
+      case 'deepseek':
+        return 'https://platform.deepseek.com';
+      case 'zhipu':
+        return 'https://open.bigmodel.cn';
+      case 'kimi':
+        return 'https://platform.moonshot.cn';
+      default:
+        return '';
+    }
+  };
+
+  // 添加一个函数来获取提供商的API密钥说明
+  const getApiKeyInstructions = () => {
+    switch (provider.type) {
+      case 'deepseek':
+        return '请访问 DeepSeek 平台获取API密钥';
+      case 'zhipu':
+        return '请访问智谱AI平台获取API密钥';
+      case 'kimi':
+        return '请访问 Moonshot 平台获取API密钥';
+      default:
+        return '请获取API密钥';
+    }
+  };
+
   const getStatusColor = () => {
     if (!provider.enabled) return 'bg-gray-100 text-gray-800';
     switch (provider.testStatus) {
@@ -168,6 +243,45 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
       default:
         return '未测试';
     }
+  };
+
+  // 添加一个函数来获取推荐模型
+  const getRecommendedModels = () => {
+    // 根据提供商类型返回推荐模型
+    switch (provider.type) {
+      case 'deepseek':
+        return models.filter(model => 
+          model.id.includes('deepseek-chat') || 
+          model.id.includes('deepseek-coder')
+        ).slice(0, 3);
+      case 'zhipu':
+        return models.filter(model => 
+          model.id.includes('GLM') || 
+          model.id.includes('glm')
+        ).slice(0, 3);
+      case 'kimi':
+        return models.filter(model => 
+          model.id.includes('moonshot')
+        ).slice(0, 3);
+      default:
+        return models.slice(0, 3);
+    }
+  };
+
+  // 添加一个函数来处理快速模型选择
+  const handleQuickModelSelect = (modelId: string) => {
+    setInternalSelectedModel(modelId);
+    if (onModelSelect) {
+      onModelSelect(modelId);
+    }
+    setIsEditing(true); // 保持编辑状态以便保存
+  };
+
+  // 添加一个函数来处理模型选择完成
+  const handleModelSelectionComplete = () => {
+    setShowModelSelectionModal(false);
+    // 保存配置
+    handleSave();
   };
 
   return (
@@ -213,7 +327,13 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
           </label>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => aiSettingsService.toggleProvider(provider.id!)}
+              onClick={async () => {
+                await aiSettingsService.toggleProvider(provider.id!);
+                // 通知父组件更新状态
+                if (onUpdate) {
+                  onUpdate({ ...provider, enabled: !provider.enabled });
+                }
+              }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 provider.enabled ? 'bg-primary-600' : 'bg-gray-200'
               }`}
@@ -257,9 +377,17 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
           <div className="text-sm">
             <span className="font-medium text-yellow-900">配置提示：</span>
             <span className="text-yellow-700">
-              {provider.type === 'deepseek' && '请访问 DeepSeek 平台 (platform.deepseek.com) 获取API密钥'}
-              {provider.type === 'zhipu' && '请访问智谱AI平台 (open.bigmodel.cn) 获取API密钥'}
-              {provider.type === 'kimi' && '请访问 Moonshot 平台 (platform.moonshot.cn) 获取API密钥'}
+              {getApiKeyInstructions()}
+              {getProviderLink() && (
+                <a 
+                  href={getProviderLink()} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-yellow-800 underline ml-1"
+                >
+                  访问官网
+                </a>
+              )}
             </span>
           </div>
         </div>
@@ -342,16 +470,7 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
       <div className="flex items-center justify-between mb-4">
         {/* 左侧按钮 */}
         <div className="flex items-center gap-2">
-          {/* 加载模型列表按钮 - 有API密钥时显示 */}
-          {(provider.apiKey || (apiKey && apiKey !== '••••••••••••••••')) && (
-            <button
-              onClick={handleLoadModels}
-              disabled={isLoadingModels}
-              className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
-            >
-              {isLoadingModels ? '加载中...' : '加载模型列表'}
-            </button>
-          )}
+          {/* 移除加载模型列表按钮，与弹窗选择功能重复 */}
         </div>
 
         {/* 右侧按钮 */}
@@ -382,32 +501,31 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
         </div>
       </div>
 
-      {/* 模型选择下拉框 - 在API密钥配置下方添加 */}
-      {provider.apiKey && (
+      {/* 快速模型选择 - 显示推荐模型 */}
+      {models.length > 0 && (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            选择模型
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            推荐模型
           </label>
-          {models.length > 0 ? (
-            <select
-              value={selectedModel || provider.selectedModel || ''}
-              onChange={handleModelChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">请选择模型</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} - {model.description}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500">
-              请先加载模型列表
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {getRecommendedModels().map((model) => (
+              <button
+                key={model.id}
+                onClick={() => handleQuickModelSelect(model.id)}
+                className={`px-3 py-1 text-sm rounded-full border ${
+                  selectedModel === model.id
+                    ? 'bg-primary-100 border-primary-500 text-primary-700'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {model.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* 移除搜索框和模型选择下拉框，与弹窗选择功能重复 */}
 
       {/* 模型列表 */}
       {showModels && (
@@ -422,35 +540,18 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
             </button>
           </div>
 
-          {/* 当前选择的模型 */}
+          {/* 当前选择的模型 - 只保留这个显示 */}
           {selectedModel && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                当前选择的模型
-              </label>
               <div className="p-3 bg-blue-50 border border-blue-200 rounded">
                 {models.find(m => m.id === selectedModel) ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-blue-900">
-                        {models.find(m => m.id === selectedModel)?.name}
-                      </div>
-                      <div className="text-sm text-blue-700">
-                        {models.find(m => m.id === selectedModel)?.description}
-                      </div>
+                  <div>
+                    <div className="font-medium text-blue-900">
+                      {models.find(m => m.id === selectedModel)?.name}
                     </div>
-                    <button
-                      onClick={() => {
-                        setInternalSelectedModel('');
-                        if (onModelSelect) {
-                          onModelSelect('');
-                        }
-                        setIsEditing(true);
-                      }}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      更改
-                    </button>
+                    <div className="text-sm text-blue-700">
+                      {models.find(m => m.id === selectedModel)?.description}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-blue-700">
@@ -463,8 +564,8 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
 
           {/* 模型列表 */}
           <div className="space-y-3">
-            {models.length > 0 ? (
-              models.map((model) => (
+            {getFilteredAndSortedModels().length > 0 ? (
+              getFilteredAndSortedModels().map((model) => (
                 <ModelInfoCard
                   key={model.id}
                   model={model}
@@ -475,13 +576,184 @@ export function ProviderConfig({ provider, onUpdate, onTest, onModelSelect, sele
               ))
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <p>暂无可用模型</p>
-                <p className="text-sm">请检查API密钥是否正确</p>
+                <p>未找到匹配的模型</p>
+                <p className="text-sm">请尝试调整搜索条件</p>
+                <button
+                  onClick={resetSearch}
+                  className="mt-2 px-4 py-2 text-sm bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
+                >
+                  重置搜索
+                </button>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* 模型选择弹窗 - 现代化设计 */}
+      {showModelSelectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">选择AI模型</h3>
+                  <p className="text-gray-600 mt-1">连接测试成功，请从以下模型中选择一个</p>
+                </div>
+                <button
+                  onClick={() => setShowModelSelectionModal(false)}
+                  className="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                >
+                  <XIcon />
+                </button>
+              </div>
+            </div>
+            
+            <div className="mb-4 p-4">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="搜索模型名称、描述或功能..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'name' | 'capabilities' | 'pricing')}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="name">按名称排序</option>
+                    <option value="capabilities">按功能排序</option>
+                    <option value="pricing">按价格排序</option>
+                  </select>
+                  {(searchTerm || sortBy !== 'name') && (
+                    <button
+                      onClick={resetSearch}
+                      className="px-3 py-2 text-sm text-gray-700 hover:text-gray-900"
+                    >
+                      重置
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="overflow-y-auto max-h-[60vh]">
+              {models.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <svg className="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p>暂无可用模型</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                  {getFilteredAndSortedModels().length > 0 ? (
+                    getFilteredAndSortedModels().map((model) => (
+                      <div
+                        key={model.id}
+                        className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                          selectedModel === model.id
+                            ? 'border-primary-500 bg-primary-50 shadow-md'
+                            : 'border-gray-200 hover:border-primary-300 hover:shadow-sm'
+                        }`}
+                        onClick={() => handleModelSelect(model)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-semibold text-gray-900">{model.name}</h4>
+                              {model.recommended && (
+                                <span className="px-2 py-1 text-xs bg-primary-100 text-primary-700 rounded-full">
+                                  推荐
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-2">{model.description}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                                {model.provider}
+                              </span>
+                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                {model.maxTokens >= 1000000
+                                  ? `${(model.maxTokens / 1000000).toFixed(1)}M`
+                                  : `${(model.maxTokens / 1000).toFixed(1)}K`} tokens
+                              </span>
+                              {model.capabilities.slice(0, 2).map((capability, index) => (
+                                <span
+                                  key={index}
+                                  className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
+                                >
+                                  {capability}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {selectedModel === model.id && (
+                            <div className="text-primary-600 ml-2">
+                              <CheckIcon />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 md:col-span-2">
+                      <p>未找到匹配的模型</p>
+                      <p className="text-sm">请尝试调整搜索条件</p>
+                      <button
+                        onClick={resetSearch}
+                        className="mt-2 px-4 py-2 text-sm bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
+                      >
+                        重置搜索
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowModelSelectionModal(false)}
+                  className="px-5 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleModelSelectionComplete}
+                  disabled={!selectedModel}
+                  className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  确认选择
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// 添加图标组件
+function XIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+    </svg>
   );
 }

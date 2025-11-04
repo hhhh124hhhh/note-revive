@@ -179,15 +179,13 @@ export class NoteRepository {
    */
   async getNotesByTag(tagName: string): Promise<NoteType[]> {
     try {
-      return await coreDb.notes
-        .where('tags')
-        .contains(tagName)
-        .orderBy('updatedAt')
-        .reverse()
-        .toArray();
+      const allNotes = await coreDb.notes.toArray();
+      return allNotes
+        .filter(note => note.tags.includes(tagName))
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     } catch (error) {
       console.error('❌ 按标签获取便签失败:', error);
-      throw new Error(`按标签获取便签失败: ${error.message}`);
+      throw new Error(`按标签获取便签失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -196,15 +194,13 @@ export class NoteRepository {
    */
   async getNotesByStatus(status: NoteType['status']): Promise<NoteType[]> {
     try {
-      return await coreDb.notes
-        .where('status')
-        .equals(status)
-        .orderBy('updatedAt')
-        .reverse()
-        .toArray();
+      const allNotes = await coreDb.notes.toArray();
+      return allNotes
+        .filter(note => note.status === status)
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
     } catch (error) {
       console.error('❌ 按状态获取便签失败:', error);
-      throw new Error(`按状态获取便签失败: ${error.message}`);
+      throw new Error(`按状态获取便签失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -256,7 +252,7 @@ export class NoteRepository {
         .slice(0, limit);
     } catch (error) {
       console.error('❌ 搜索便签失败:', error);
-      throw new Error(`搜索便签失败: ${error.message}`);
+      throw new Error(`搜索便签失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -265,14 +261,13 @@ export class NoteRepository {
    */
   async getRecentNotes(limit: number = 10): Promise<NoteType[]> {
     try {
-      return await coreDb.notes
-        .orderBy('createdAt')
-        .reverse()
-        .limit(limit)
-        .toArray();
+      const allNotes = await coreDb.notes.toArray();
+      return allNotes
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, limit);
     } catch (error) {
       console.error('❌ 获取最近便签失败:', error);
-      throw new Error(`获取最近便签失败: ${error.message}`);
+      throw new Error(`获取最近便签失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -282,16 +277,14 @@ export class NoteRepository {
   async getNotesForReview(): Promise<NoteType[]> {
     try {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const allNotes = await coreDb.notes.toArray();
 
-      return await coreDb.notes
-        .where('status')
-        .notEqual('reviewed')
-        .and(note => note.createdAt < sevenDaysAgo)
-        .orderBy('createdAt')
-        .toArray();
+      return allNotes
+        .filter(note => note.status !== 'reviewed' && note.createdAt < sevenDaysAgo)
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     } catch (error) {
       console.error('❌ 获取需要回顾的便签失败:', error);
-      throw new Error(`获取需要回顾的便签失败: ${error.message}`);
+      throw new Error(`获取需要回顾的便签失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -314,7 +307,7 @@ export class NoteRepository {
       console.log(`✅ 批量更新状态成功: ${noteIds.length}个便签`);
     } catch (error) {
       console.error('❌ 批量更新状态失败:', error);
-      throw new Error(`批量更新状态失败: ${error.message}`);
+      throw new Error(`批量更新状态失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -359,7 +352,7 @@ export class NoteRepository {
       };
     } catch (error) {
       console.error('❌ 获取便签统计失败:', error);
-      throw new Error(`获取便签统计失败: ${error.message}`);
+      throw new Error(`获取便签统计失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -397,7 +390,9 @@ export class NoteRepository {
 
       let deletedCount = 0;
       for (const note of finalNotesToDelete) {
-        await this.deleteNote(note.id);
+        if (note.id) {
+          await this.deleteNote(note.id);
+        }
         deletedCount++;
       }
 
@@ -405,7 +400,7 @@ export class NoteRepository {
       return { deletedCount };
     } catch (error) {
       console.error('❌ 清理便签失败:', error);
-      throw new Error(`清理便签失败: ${error.message}`);
+      throw new Error(`清理便签失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

@@ -6,6 +6,8 @@ export { AIRepository, aiRepository } from './ai-repository';
 
 // 导出Repository类型
 export type {
-  NoteRepository as INoteRepository,
-  AIRepository as IAIRepository
+  NoteRepository as INoteRepository
 } from './note-repository';
+export type {
+  AIRepository as IAIRepository
+} from './ai-repository';

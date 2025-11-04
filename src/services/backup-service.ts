@@ -1,4 +1,4 @@
-import { databaseManager } from '../db';
+import { databaseManager } from '../db/database-manager';
 import { Note as NoteType } from '../types';
 
 // 备份文件接口
@@ -114,7 +114,7 @@ export class BackupService {
       return backupFile;
     } catch (error) {
       console.error('❌ 创建备份失败:', error);
-      throw new Error(`备份创建失败: ${error.message}`);
+      throw new Error(`备份创建失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -144,7 +144,7 @@ export class BackupService {
       return finalFilename;
     } catch (error) {
       console.error('❌ 保存备份文件失败:', error);
-      throw new Error(`保存备份失败: ${error.message}`);
+      throw new Error(`保存备份失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -172,7 +172,7 @@ export class BackupService {
       return backupFile;
     } catch (error) {
       console.error('❌ 加载备份文件失败:', error);
-      throw new Error(`加载备份失败: ${error.message}`);
+      throw new Error(`加载备份失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -221,8 +221,8 @@ export class BackupService {
 
       return {
         success: false,
-        message: `数据恢复失败: ${error.message}`,
-        details: { error: error.message }
+        message: `数据恢复失败: ${error instanceof Error ? error.message : String(error)}`,
+        details: { error: error instanceof Error ? error.message : String(error) }
       };
     }
   }

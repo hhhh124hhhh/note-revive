@@ -185,8 +185,13 @@ export class AISettingsService {
       const credentials = await this.getProviderCredentials();
       const apiKey = this.getProviderApiKey(provider, credentials);
 
+      // 检查API密钥是否存在且不是示例密钥
       if (!apiKey) {
         throw new Error('缺少API密钥');
+      }
+      
+      if (this.isExampleApiKey(apiKey)) {
+        throw new Error('请使用有效的API密钥，当前使用的是示例密钥');
       }
 
       const startTime = Date.now();
@@ -215,10 +220,14 @@ export class AISettingsService {
         success: testResult.success,
         message: testResult.message,
         responseTime,
-        models
+        models: testResult.success ? models : undefined
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '测试失败';
+      // 处理401错误，提供更友好的错误消息
+      let errorMessage = error instanceof Error ? error.message : '测试失败';
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        errorMessage = 'API密钥无效或已过期，请检查您的API密钥配置';
+      }
 
       // 更新测试状态
       await updateProviderTestStatus(providerId, 'failed', errorMessage);
@@ -230,6 +239,16 @@ export class AISettingsService {
         responseTime: 0
       };
     }
+  }
+  
+  // 检测示例API密钥的辅助方法
+  private isExampleApiKey(apiKey: string): boolean {
+    const exampleKeyPatterns = [
+      'sk-example', 'example-key-placeholder', 'demo', 'test'
+    ];
+    
+    const lowerKey = apiKey.toLowerCase();
+    return exampleKeyPatterns.some(pattern => lowerKey.includes(pattern));
   }
 
   /**
@@ -515,15 +534,21 @@ export class AISettingsService {
           const existingProvider = existingProviders.find(p => p.type === envProvider.type);
 
           if (existingProvider) {
-            // 更新现有提供商（始终更新环境变量配置）
-            await updateAIProvider(existingProvider.id!, {
-              apiKey: encryptContent(envProvider.apiKey),
-              enabled: envProvider.enabled,
-              selectedModel: envProvider.defaultModel,
-              testStatus: 'success' as const,
-              testMessage: '从环境变量加载'
-            });
-            console.log(`✅ 更新提供商 ${envProvider.name} 的环境配置`);
+            // 检查是否已有用户设置的API密钥
+            // 只有在没有用户设置的API密钥或密钥是从环境变量加载的情况下，才更新
+            const configSource = await this.getConfigSource(existingProvider.id!);
+            if (configSource === 'default' || configSource === 'environment') {
+              await updateAIProvider(existingProvider.id!, {
+                apiKey: encryptContent(envProvider.apiKey),
+                enabled: envProvider.enabled,
+                selectedModel: existingProvider.selectedModel || envProvider.defaultModel, // 保留用户选择的模型
+                testStatus: 'success' as const,
+                testMessage: '从环境变量加载'
+              });
+              console.log(`✅ 更新提供商 ${envProvider.name} 的环境配置`);
+            } else {
+              console.log(`⚠️ 跳过更新 ${envProvider.name}，用户已有自定义设置`);
+            }
           } else {
             // 创建新的提供商记录
             await addAIProvider({

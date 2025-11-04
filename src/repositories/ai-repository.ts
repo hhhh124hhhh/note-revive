@@ -1,4 +1,4 @@
-import { aiDb, AISuggestion, AIProvider, AIModelUsage, AIModelCache } from '../db';
+import { aiDb, AISuggestion, AIProvider, AIModelUsage, AIModelCache } from '../db/ai-db';
 import { Note as NoteType } from '../types';
 
 /**
@@ -36,7 +36,9 @@ export class AIRepository {
    */
   async getEnabledProviders(): Promise<AIProvider[]> {
     try {
-      return await aiDb.aiProviders.where('enabled').equals(true).toArray();
+      // 先获取所有提供商，然后手动过滤启用的
+      const allProviders = await aiDb.aiProviders.toArray();
+      return allProviders.filter(provider => provider.enabled);
     } catch (error) {
       console.error('❌ 获取启用的AI提供商失败:', error);
       return [];
@@ -48,7 +50,7 @@ export class AIRepository {
    */
   async getProviderByType(type: string): Promise<AIProvider | undefined> {
     try {
-      return await aiDb.aiProviders.where('type').equals(type as any).first();
+      return await aiDb.aiProviders.where('type').equals(type).first();
     } catch (error) {
       console.error('❌ 根据类型获取AI提供商失败:', error);
       return undefined;
@@ -71,7 +73,7 @@ export class AIRepository {
       return id;
     } catch (error) {
       console.error('❌ 创建AI提供商失败:', error);
-      throw new Error(`创建AI提供商失败: ${error.message}`);
+      throw new Error(`创建AI提供商失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -87,7 +89,7 @@ export class AIRepository {
       console.log('✅ AI提供商更新成功:', id);
     } catch (error) {
       console.error('❌ 更新AI提供商失败:', error);
-      throw new Error(`更新AI提供商失败: ${error.message}`);
+      throw new Error(`更新AI提供商失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -104,7 +106,7 @@ export class AIRepository {
       console.log('✅ AI提供商删除成功:', id);
     } catch (error) {
       console.error('❌ 删除AI提供商失败:', error);
-      throw new Error(`删除AI提供商失败: ${error.message}`);
+      throw new Error(`删除AI提供商失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -119,7 +121,7 @@ export class AIRepository {
       }
     } catch (error) {
       console.error('❌ 切换提供商状态失败:', error);
-      throw new Error(`切换提供商状态失败: ${error.message}`);
+      throw new Error(`切换提供商状态失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -128,14 +130,14 @@ export class AIRepository {
   /**
    * 保存AI建议
    */
-  async saveSuggestion(suggestion: Omit<AISuggestion, 'id'>): Promise<number> {
+  async saveSuggestion(suggestion: Omit<AISuggestion, 'id'>): Promise<number[]> {
     try {
       const id = await aiDb.aiSuggestions.add(suggestion);
-      console.log('✅ AI建议保存成功:', id);
-      return id;
+      console.log(`✅ 保存AI建议成功: 1条`);
+      return [id]; // 返回单个ID的数组，保持返回类型一致
     } catch (error) {
       console.error('❌ 保存AI建议失败:', error);
-      throw new Error(`保存AI建议失败: ${error.message}`);
+      throw new Error(`保存AI建议失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -144,12 +146,17 @@ export class AIRepository {
    */
   async saveSuggestions(suggestions: Omit<AISuggestion, 'id'>[]): Promise<number[]> {
     try {
-      const ids = await aiDb.aiSuggestions.bulkAdd(suggestions);
+      // 逐个添加以确保返回正确的ID数组
+      const ids: number[] = [];
+      for (const suggestion of suggestions) {
+        const id = await aiDb.aiSuggestions.add(suggestion);
+        ids.push(id);
+      }
       console.log(`✅ 批量保存AI建议成功: ${ids.length}条`);
       return ids;
     } catch (error) {
       console.error('❌ 批量保存AI建议失败:', error);
-      throw new Error(`批量保存AI建议失败: ${error.message}`);
+      throw new Error(`批量保存AI建议失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -161,7 +168,7 @@ export class AIRepository {
       let query = aiDb.aiSuggestions.where('noteId').equals(noteId);
 
       if (suggestionType) {
-        query = query.and(suggestion => suggestion.suggestionType === suggestionType);
+        query = query.and((suggestion: AISuggestion) => suggestion.suggestionType === suggestionType);
       }
 
       return await query.toArray();
@@ -176,11 +183,11 @@ export class AIRepository {
    */
   async getRecentSuggestions(limit: number = 20): Promise<AISuggestion[]> {
     try {
-      return await aiDb.aiSuggestions
-        .orderBy('lastAnalyzed')
-        .reverse()
-        .limit(limit)
-        .toArray();
+      // 先获取所有数据，然后手动排序和限制数量
+      const allSuggestions = await aiDb.aiSuggestions.toArray();
+      return allSuggestions
+        .sort((a, b) => new Date(b.lastAnalyzed).getTime() - new Date(a.lastAnalyzed).getTime())
+        .slice(0, limit);
     } catch (error) {
       console.error('❌ 获取最近AI建议失败:', error);
       return [];
@@ -192,13 +199,12 @@ export class AIRepository {
    */
   async getSuggestionsByType(suggestionType: AISuggestion['suggestionType'], limit: number = 50): Promise<AISuggestion[]> {
     try {
-      return await aiDb.aiSuggestions
-        .where('suggestionType')
-        .equals(suggestionType)
-        .orderBy('lastAnalyzed')
-        .reverse()
-        .limit(limit)
-        .toArray();
+      // 先获取匹配类型的所有建议，然后手动排序和限制数量
+      const allSuggestions = await aiDb.aiSuggestions.toArray();
+      return allSuggestions
+        .filter(s => s.suggestionType === suggestionType)
+        .sort((a, b) => new Date(b.lastAnalyzed).getTime() - new Date(a.lastAnalyzed).getTime())
+        .slice(0, limit);
     } catch (error) {
       console.error('❌ 按类型获取AI建议失败:', error);
       return [];
@@ -214,7 +220,7 @@ export class AIRepository {
       console.log('✅ AI建议删除成功:', id);
     } catch (error) {
       console.error('❌ 删除AI建议失败:', error);
-      throw new Error(`删除AI建议失败: ${error.message}`);
+      throw new Error(`删除AI建议失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -224,13 +230,19 @@ export class AIRepository {
   async cleanupExpiredSuggestions(daysOld: number = 7): Promise<number> {
     try {
       const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
-      const deletedCount = await aiDb.aiSuggestions
+      const suggestionsToDelete = await aiDb.aiSuggestions
         .where('lastAnalyzed')
         .below(cutoffDate)
-        .delete();
+        .toArray();
+      
+      // 批量删除并返回删除的记录数
+      if (suggestionsToDelete.length > 0) {
+        const ids = suggestionsToDelete.map(s => s.id!);
+        await aiDb.aiSuggestions.bulkDelete(ids);
+      }
 
-      console.log(`✅ 清理过期AI建议: 删除了 ${deletedCount} 条记录`);
-      return deletedCount;
+      console.log(`✅ 清理过期AI建议: 删除了 ${suggestionsToDelete.length} 条记录`);
+      return suggestionsToDelete.length;
     } catch (error) {
       console.error('❌ 清理过期AI建议失败:', error);
       return 0;
@@ -256,7 +268,7 @@ export class AIRepository {
       const existing = await aiDb.aiModelUsage
         .where('providerId')
         .equals(providerId)
-        .and(usage => usage.modelId === modelId && usage.useCase === useCase)
+        .and((usage: AIModelUsage) => usage.modelId === modelId && usage.useCase === useCase)
         .first();
 
       if (existing) {
@@ -295,7 +307,7 @@ export class AIRepository {
       console.log('✅ 模型使用记录成功');
     } catch (error) {
       console.error('❌ 记录模型使用失败:', error);
-      throw new Error(`记录模型使用失败: ${error.message}`);
+      throw new Error(`记录模型使用失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -317,14 +329,18 @@ export class AIRepository {
   /**
    * 获取最受欢迎的模型
    */
-  async getPopularModels(limit: number = 5): Promise<Array<{
+  async getPopularModels(limit: number = 10): Promise<Array<{
     modelId: string;
     totalUsage: number;
     averageCost: number;
     averageResponseTime: number;
   }>> {
     try {
-      const stats = await aiDb.aiModelUsage.toArray();
+      // 先获取所有使用记录，然后手动排序和限制数量
+      const allUsageRecords = await aiDb.aiModelUsage.toArray();
+      const stats = allUsageRecords
+        .sort((a, b) => new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime())
+        .slice(0, limit);
       const modelStats = new Map<string, {
         usage: number;
         totalCost: number;
@@ -382,7 +398,7 @@ export class AIRepository {
       await aiDb.aiModelCache
         .where('providerId')
         .equals(providerId)
-        .and(cache => cache.modelId === modelId)
+        .and((cache: AIModelCache) => cache.modelId === modelId)
         .delete();
 
       // 添加新缓存
@@ -397,7 +413,7 @@ export class AIRepository {
       console.log('✅ 模型数据缓存成功');
     } catch (error) {
       console.error('❌ 缓存模型数据失败:', error);
-      throw new Error(`缓存模型数据失败: ${error.message}`);
+      throw new Error(`缓存模型数据失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -409,7 +425,7 @@ export class AIRepository {
       const cache = await aiDb.aiModelCache
         .where('providerId')
         .equals(providerId)
-        .and(cache => cache.modelId === modelId && cache.expiresAt > new Date())
+        .and((cache: AIModelCache) => cache.modelId === modelId && cache.expiresAt > new Date())
         .first();
 
       if (cache) {
@@ -455,7 +471,7 @@ export class AIRepository {
       console.log('✅ 提供商缓存清理成功:', providerId);
     } catch (error) {
       console.error('❌ 清理提供商缓存失败:', error);
-      throw new Error(`清理提供商缓存失败: ${error.message}`);
+      throw new Error(`清理提供商缓存失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -496,20 +512,20 @@ export class AIRepository {
         aiDb.aiModelCache.toArray()
       ]);
 
-      const enabledProviders = providers.filter(p => p.enabled).length;
+      const enabledProviders = providers.filter((p: AIProvider) => p.enabled).length;
 
-      const suggestionsByType = suggestions.reduce((acc, suggestion) => {
+      const suggestionsByType = suggestions.reduce((acc: Record<AISuggestion['suggestionType'], number>, suggestion: AISuggestion) => {
         acc[suggestion.suggestionType] = (acc[suggestion.suggestionType] || 0) + 1;
         return acc;
       }, {} as Record<AISuggestion['suggestionType'], number>);
 
-      const totalRequests = usageRecords.reduce((sum, record) => sum + record.requestCount, 0);
-      const totalCost = usageRecords.reduce((sum, record) => sum + record.totalCost, 0);
-      const totalResponseTime = usageRecords.reduce((sum, record) => sum + record.averageResponseTime * record.requestCount, 0);
+      const totalRequests = usageRecords.reduce((sum: number, record: AIModelUsage) => sum + record.requestCount, 0);
+      const totalCost = usageRecords.reduce((sum: number, record: AIModelUsage) => sum + record.totalCost, 0);
+      const totalResponseTime = usageRecords.reduce((sum: number, record: AIModelUsage) => sum + record.averageResponseTime * record.requestCount, 0);
       const averageResponseTime = totalRequests > 0 ? totalResponseTime / totalRequests : 0;
 
       const now = new Date();
-      const expiredCacheCount = cacheEntries.filter(cache => cache.expiresAt < now).length;
+      const expiredCacheCount = cacheEntries.filter((cache: AIModelCache) => cache.expiresAt < now).length;
 
       return {
         providers: {
@@ -532,7 +548,7 @@ export class AIRepository {
       };
     } catch (error) {
       console.error('❌ 获取AI统计失败:', error);
-      throw new Error(`获取AI统计失败: ${error.message}`);
+      throw new Error(`获取AI统计失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link2, X, RefreshCw } from 'lucide-react';
 import { getNoteRelations } from '../services/ai';
+import { safeExecuteAI } from '../services/ai/index';
 import { Note } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
@@ -26,66 +27,140 @@ export default function RelatedNotes({
   const [relations, setRelations] = useState<NoteRelation | null>(null);
   const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [relatedNotes, setRelatedNotes] = useState<Note[]>([]);
 
   // 获取所有便签
   const allNotes = useLiveQuery(() => db.notes.toArray()) || [];
 
-  // 使用 useMemo 优化相关便签计算
-  const relatedNotes = useMemo(() => {
-    if (!relations?.relatedNoteIds || !allNotes.length) return [];
+  // 计算是否应该渲染组件
+  const shouldRender = !!currentNote && !currentNote.isPrivate && !dismissed && (isVisible !== false);
 
-    return relations.relatedNoteIds
-      .map(id => allNotes.find(note => note.id === id))
-      .filter(note => note && !note.isPrivate) as Note[];
-  }, [relations, allNotes]);
+  // 获取关联便签的函数
+  const fetchRelatedNotes = async () => {
+    if (!currentNote || !currentNote.content) return;
 
-  // 使用 useMemo 优化渲染条件判断
-  const shouldRender = useMemo(() => {
-    return isVisible &&
-           !dismissed &&
-           currentNote &&
-           !currentNote.isPrivate &&
-           (loading || (relations && relatedNotes.length > 0));
-  }, [isVisible, dismissed, currentNote, loading, relations, relatedNotes]);
-
-  // 当当前便签变化时，获取关联建议
-  useEffect(() => {
-    if (!isVisible || !currentNote || dismissed || currentNote.isPrivate) {
-      setRelations(null);
-      setLoading(false);
-      return;
-    }
-
-    // 如果便签内容太短，不进行关联分析
-    if (currentNote.content.length < 20) {
-      setRelations(null);
-      setLoading(false);
-      return;
-    }
-
-    const fetchRelations = async () => {
-      setLoading(true);
-      try {
-        if (currentNote?.id && allNotes.length > 1) {
-          console.log(`正在获取便签 ${currentNote.id} 的关联建议...`);
-          const noteRelations = await getNoteRelations(currentNote.id, allNotes);
-          console.log(`获取到关联建议:`, noteRelations);
-          setRelations(noteRelations);
-        }
-      } catch (error) {
-        console.warn('获取便签关联失败:', error);
-        setRelations(null);
-      } finally {
+    setLoading(true);
+    try {
+      console.log('RelatedNotes: 开始获取关联便签');
+      // 调用AI服务获取关联关系
+      if (!currentNote.id) {
+        console.warn('RelatedNotes: 当前便签ID不存在，无法获取关联关系');
         setLoading(false);
+        return;
       }
-    };
+      
+      // 使用安全的AI执行方式，确保即使AI服务不可用也能工作
+      const relationResult = await safeExecuteAI(
+        async () => {
+          // 尝试使用AI服务
+          return await getNoteRelations(currentNote.id!);
+        },
+        async () => {
+          // 降级方案：简单的基于标签和内容的匹配
+          console.log('RelatedNotes: AI服务不可用，使用降级匹配策略');
+          
+          // 过滤出其他便签
+          const otherNotes = allNotes.filter(note => 
+            note && note.id && note.id !== currentNote.id && !note.isPrivate
+          );
+          
+          // 简单的关键词匹配
+          const targetWords = new Set(
+            currentNote.content.toLowerCase().split(/\s+/).filter(word => word.length > 1)
+          );
+          
+          // 计算简单相似度
+          const scoredNotes = otherNotes
+            .map(note => {
+              const noteWords = new Set(
+                note.content.toLowerCase().split(/\s+/).filter(word => word.length > 1)
+              );
+              
+              // 计算共同词汇
+              const commonWords = [...targetWords].filter(word => noteWords.has(word));
+              const similarity = commonWords.length / Math.max(targetWords.size, 1);
+              
+              // 检查标签匹配
+              let tagMatch = 0;
+              if (currentNote.tags && note.tags) {
+                const commonTags = currentNote.tags.filter(tag => note.tags!.includes(tag));
+                tagMatch = commonTags.length / Math.max(currentNote.tags.length, 1);
+              }
+              
+              // 综合分数
+              const score = Math.max(similarity, tagMatch);
+              
+              return {
+                id: note.id!,
+                score,
+                relationType: tagMatch > similarity ? 'tags' : 'content'
+              };
+            })
+            .filter(note => note.score > 0.1)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 4);
+          
+          if (scoredNotes.length > 0) {
+            return {
+              noteId: currentNote.id!,
+              relatedNoteIds: scoredNotes.map(n => n.id),
+              relationType: scoredNotes[0].relationType,
+              confidence: scoredNotes.reduce((sum, n) => sum + n.score, 0) / scoredNotes.length
+            };
+          }
+          
+          return null;
+        }
+      );
+      
+      console.log('RelatedNotes: 关联结果:', relationResult);
+      
+      if (relationResult && relationResult.relatedNoteIds && relationResult.relatedNoteIds.length > 0) {
+        // 确保relationResult符合NoteRelation类型
+        if (relationResult && typeof relationResult === 'object') {
+          const typedResult: NoteRelation = {
+            noteId: relationResult.noteId,
+            relatedNoteIds: relationResult.relatedNoteIds,
+            relationType: (relationResult.relationType as 'tags' | 'content' | 'semantic') || 'content',
+            confidence: relationResult.confidence
+          };
+          setRelations(typedResult);
+        } else {
+          setRelations(null);
+        }
+        
+        // 从所有便签中过滤出关联便签
+        const matchedNotes = allNotes.filter(note => 
+          note && note.id && 
+          relationResult.relatedNoteIds.includes(note.id) && 
+          note.id !== currentNote.id // 排除当前便签
+        );
+        
+        console.log('RelatedNotes: 找到关联便签数量:', matchedNotes.length);
+        setRelatedNotes(matchedNotes);
+      } else {
+        console.log('RelatedNotes: 未找到关联便签');
+        setRelations(null);
+        setRelatedNotes([]);
+      }
+    } catch (error) {
+      console.error('RelatedNotes: 获取关联便签失败:', error);
+      setRelations(null);
+      setRelatedNotes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // 延迟获取，避免频繁调用
-    const debounceTimer = setTimeout(fetchRelations, 500);
-    return () => clearTimeout(debounceTimer);
-  }, [currentNote?.id, currentNote?.content, allNotes.length, isVisible, dismissed]);
+  // 当当前便签变化时，获取关联便签
+  useEffect(() => {
+    if (shouldRender && currentNote) {
+      fetchRelatedNotes();
+    } else {
+      setRelatedNotes([]);
+    }
+  }, [currentNote?.id, shouldRender, allNotes]); // 依赖allNotes以确保数据同步
 
-  // 如果不需要显示，则不渲染
   if (!shouldRender) {
     return null;
   }
@@ -109,8 +184,9 @@ export default function RelatedNotes({
     return 'text-gray-600 bg-gray-100';
   };
 
+  // 添加data-testid用于调试
   return (
-    <div className="mt-6 border-t pt-6">
+    <div className="mt-6 border-t pt-6" data-testid="related-notes-component">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Link2 className="w-5 h-5 text-blue-600" />
@@ -149,15 +225,14 @@ export default function RelatedNotes({
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center gap-2 text-blue-600">
-          <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-          <span className="text-sm">正在查找相关便签...</span>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {relatedNotes.map((note) => {
+      <div className="space-y-3">
+        {relatedNotes.length > 0 ? (
+          relatedNotes.map((note) => {
+            // 安全检查
+            if (!note || !note.content) return null;
+            
             const preview = note.content.substring(0, 80) + (note.content.length > 80 ? '...' : '');
+            const isMock = note.id?.startsWith('mock-');
 
             return (
               <div
@@ -167,10 +242,10 @@ export default function RelatedNotes({
               >
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-medium text-gray-900 line-clamp-1 flex-1">
-                    {preview.substring(0, 40)}...
+                    {preview.substring(0, 40) + '...'}
                   </h4>
-                  <span className={`ml-2 text-xs px-2 py-1 rounded ${getConfidenceColor(relations?.confidence || 0)}`}>
-                    {Math.round((relations?.confidence || 0) * 100)}%
+                  <span className={`ml-2 text-xs px-2 py-1 rounded ${getConfidenceColor(relations?.confidence || 0.7)}`}>
+                    {Math.round((relations?.confidence || 0.7) * 100)}%
                   </span>
                 </div>
 
@@ -180,7 +255,7 @@ export default function RelatedNotes({
 
                 <div className="flex items-center justify-between">
                   <div className="flex flex-wrap gap-1">
-                    {note.tags.slice(0, 3).map(tag => (
+                    {note.tags && Array.isArray(note.tags) && note.tags.slice(0, 3).map(tag => (
                       <span
                         key={tag}
                         className="text-xs bg-white text-gray-700 px-2 py-1 rounded border border-gray-300"
@@ -188,21 +263,32 @@ export default function RelatedNotes({
                         {tag}
                       </span>
                     ))}
-                    {note.tags.length > 3 && (
+                    {note.tags && Array.isArray(note.tags) && note.tags.length > 3 && (
                       <span className="text-xs text-gray-500">
                         +{note.tags.length - 3}
                       </span>
                     )}
                   </div>
                   <span className="text-xs text-gray-500">
-                    {new Date(note.updatedAt).toLocaleDateString()}
+                    {note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : ''}
                   </span>
                 </div>
               </div>
             );
-          })}
-        </div>
-      )}
+          })
+        ) : (
+          <div className="text-center py-4 text-gray-500">
+            暂无相关便签
+          </div>
+        )}
+        
+        {loading && (
+          <div className="flex items-center justify-center gap-2 text-blue-600 text-sm">
+            <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+            <span>优化推荐中...</span>
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 pt-4 border-t border-gray-200">
         <p className="text-xs text-gray-500 flex items-center gap-1">

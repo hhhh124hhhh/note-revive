@@ -392,6 +392,16 @@ function App() {
         ]);
         console.log('✅ 核心服务初始化完成（设置由 useSettings Hook 管理）');
 
+        // 确保AI提供商数据正确初始化
+        console.log('🔧 初始化AI提供商数据...');
+        try {
+          const { initDefaultAIProviders } = await import('./db');
+          await initDefaultAIProviders();
+          console.log('✅ AI提供商数据初始化完成');
+        } catch (error) {
+          console.warn('⚠️ AI提供商数据初始化失败:', error);
+        }
+
         // 异步初始化 AI 功能（可选，不阻塞应用启动）
         console.log('🤖 开始异步初始化 AI 功能...');
         initializeAI().catch(error => {
@@ -1738,6 +1748,15 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* AI推荐的相关便签 - 编辑模式 */}
+      {currentNote && (
+        <RelatedNotes
+          currentNote={currentNote}
+          onSelectNote={(note) => editNote(note)}
+          isVisible={currentView === 'editor'}
+        />
+      )}
 
       {/* Tag Management Area */}
       <div className="border-t border-gray-200 bg-white">
